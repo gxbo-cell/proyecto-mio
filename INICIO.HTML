@@ -1,0 +1,277 @@
+    <!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#f4f2ec">
+	<title>Inventario | La Tiendita</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+	<link rel="stylesheet" href="ESTILO.CSS">
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+	<script src="FUNCIONAMIENTO.JS" defer></script>
+</head>
+<body>
+	<header class="topbar">
+		<a class="brand" href="#inicio" aria-label="La Tiendita, inicio">
+			<span class="brand-mark" aria-hidden="true">LT</span>
+			<span>la tiendita<span class="brand-period">.</span></span>
+		</a>
+		<span class="topbar-note"><span class="live-dot"></span> Panel de inventario</span>
+	</header>
+
+	<main id="inicio" class="page-shell">
+		<section class="intro" aria-labelledby="page-title">
+			<div>
+				<p class="eyebrow">CONTROL DE TIENDA <span>·</span> <span id="today-date"></span></p>
+				<h1 id="page-title">Tu inventario,<br><span>bajo control.</span></h1>
+			</div>
+			<p class="intro-copy">Registra productos, mantén el stock al día y cobra tus ventas en un solo lugar.</p>
+		</section>
+
+		<section class="stats" aria-label="Resumen del inventario">
+			<article class="stat">
+				<span class="stat-label">Productos registrados</span>
+				<strong id="product-count" class="stat-value">0</strong>
+			</article>
+			<article class="stat">
+				<span class="stat-label">Unidades en tienda</span>
+				<strong id="unit-count" class="stat-value">0</strong>
+			</article>
+			<article class="stat stat-highlight">
+				<span class="stat-label">Valor del inventario</span>
+				<strong id="inventory-value" class="stat-value">$0.00</strong>
+			</article>
+			<article class="stat stat-rate">
+				<span class="stat-label">Tasa oficial BCV · Bs/USD</span>
+				<strong id="daily-rate-value" class="stat-value">Consultando...</strong>
+				<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="rate-updated">Buscando tasa del día</span></a>
+			</article>
+		</section>
+
+		<div class="workspace">
+			<section class="inventory-panel" aria-labelledby="inventory-title">
+				<div class="section-heading">
+					<div>
+						<p class="eyebrow">LO QUE TIENES</p>
+						<h2 id="inventory-title">Inventario</h2>
+					</div>
+					<label class="search-box" for="search-input">
+						<span class="search-icon" aria-hidden="true">⌕</span>
+						<input id="search-input" type="search" placeholder="Buscar producto" autocomplete="off">
+					</label>
+				</div>
+
+				<div id="stock-alert" class="stock-alert" role="status" aria-live="polite" hidden></div>
+
+				<div class="table-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th scope="col">Producto</th>
+								<th scope="col">Precio unitario</th>
+								<th scope="col">Disponibles</th>
+								<th scope="col">Acción</th>
+							</tr>
+						</thead>
+						<tbody id="product-list"></tbody>
+					</table>
+					<div id="empty-state" class="empty-state">
+						<span class="empty-icon" aria-hidden="true">＋</span>
+						<strong>Aún no hay productos</strong>
+						<span>Agrega el primero desde el formulario.</span>
+					</div>
+					<p id="no-results" class="no-results" hidden>No encontramos productos con ese nombre.</p>
+				</div>
+			</section>
+
+			<aside class="side-column">
+				<section class="form-panel" aria-labelledby="form-title">
+					<p class="eyebrow">NUEVO EN LA TIENDA</p>
+					<h2 id="form-title">Agregar producto</h2>
+					<p class="panel-copy">Completa los datos para actualizar tu inventario.</p>
+
+					<form id="product-form">
+						<label class="field-label" for="product-name">Nombre del producto</label>
+						<input id="product-name" name="name" type="text" maxlength="60" placeholder="Ej. Café molido" required>
+
+						<div class="field-row">
+							<div>
+								<label class="field-label" for="product-price">Precio (USD)</label>
+								<div class="input-prefix"><span>$</span><input id="product-price" name="price" type="number" min="0.01" step="0.01" placeholder="0.00" required></div>
+							</div>
+							<div>
+								<label class="field-label" for="product-stock">Cantidad</label>
+								<input id="product-stock" name="stock" type="number" min="0" step="1" placeholder="0" required>
+							</div>
+						</div>
+
+						<p class="discount-note"><span aria-hidden="true">↘</span> 10% de descuento automático en precios mayores a $50.</p>
+						<button class="primary-button" type="submit"><span aria-hidden="true">＋</span> Agregar al inventario</button>
+						<p id="form-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+					</form>
+				</section>
+
+				<section class="cart-panel" aria-labelledby="cart-title">
+					<div class="cart-heading">
+						<div>
+							<p class="eyebrow">TU SELECCIÓN</p>
+							<h2 id="cart-title">Carrito <span id="cart-count" class="cart-count">0</span></h2>
+						</div>
+					</div>
+					<p id="cart-empty" class="cart-empty">Aún no has añadido productos.</p>
+					<ul id="cart-items" class="cart-items" aria-label="Productos en el carrito"></ul>
+					<p id="cart-delivery-line" class="cart-delivery-line" hidden></p>
+					<div class="cart-total-row"><span>Total</span><span class="cart-total-values"><strong id="cart-total">$0.00</strong><small id="cart-total-bs">Tasa en consulta</small></span></div>
+					<button id="checkout-button" class="primary-button checkout-button" type="button" disabled>Cerrar compra</button>
+				</section>
+
+				<section class="delivery-panel" aria-labelledby="delivery-title">
+					<p class="eyebrow">ENTREGA</p>
+					<h2 id="delivery-title">Delivery</h2>
+					<label class="delivery-toggle" for="delivery-toggle">
+						<input id="delivery-toggle" type="checkbox">
+						<span>Solicitar delivery</span>
+					</label>
+					<div id="delivery-fields" hidden>
+						<label class="field-label" for="delivery-address">Ubicación de entrega</label>
+						<textarea id="delivery-address" rows="3" maxlength="240" placeholder="Dirección, zona y punto de referencia"></textarea>
+						<div class="delivery-location-actions">
+							<button id="use-current-location" class="location-button" type="button"><span aria-hidden="true">⌖</span> Usar mi ubicación</button>
+							<button id="open-google-maps" class="map-button" type="button"><span aria-hidden="true">⌖</span> Elegir en Google Maps</button>
+						</div>
+						<label class="field-label map-link-label" for="delivery-map-link">Enlace compartido de Google Maps</label>
+						<input id="delivery-map-link" class="map-link-input" type="url" placeholder="Pega aquí el enlace de la ubicación">
+						<iframe id="delivery-map-preview" class="delivery-map-preview" title="Vista previa de la ubicación de entrega" loading="lazy" allowfullscreen hidden></iframe>
+						<p id="map-feedback" class="map-feedback" role="status" aria-live="polite">Escribe una dirección, usa GPS o pega un enlace de Google Maps.</p>
+						<div id="delivery-estimate" class="delivery-estimate" hidden>
+							<div><span class="eyebrow">COSTO ESTIMADO</span><strong id="delivery-fee">$1.00</strong><small id="delivery-zone-description">Zona inicial · hasta 5 km</small></div>
+							<strong id="delivery-fee-bs" class="delivery-fee-bs"></strong>
+						</div>
+						<label class="field-label driver-field" for="delivery-driver">Conductor asignado</label>
+						<input id="delivery-driver" class="map-link-input" type="text" maxlength="60" placeholder="Nombre del conductor">
+						<p class="delivery-note">Tarifa estimada: $1 por cada 5 km desde Caracas centro.</p>
+					</div>
+					<p id="delivery-feedback" class="form-feedback error" role="status" aria-live="polite"></p>
+				</section>
+
+				<section id="delivery-tracking" class="tracking-panel" aria-labelledby="tracking-title" hidden>
+					<div class="tracking-header">
+						<div>
+							<p class="eyebrow">SEGUIMIENTO DE ENTREGA</p>
+							<h2 id="tracking-title">Tu pedido</h2>
+						</div>
+						<span id="tracking-status-badge" class="tracking-status-badge">Preparando</span>
+					</div>
+					<p id="tracking-headline" class="tracking-headline">Tu pedido está siendo preparado.</p>
+					<p id="tracking-driver" class="tracking-driver"></p>
+					<div class="tracking-progress" aria-hidden="true"><span id="tracking-progress-fill"></span></div>
+					<ol class="tracking-steps">
+						<li><button class="tracking-step" type="button" data-delivery-step="0"><span class="tracking-step-marker">1</span><span class="tracking-step-label">Recogió el pedido</span></button></li>
+						<li><button class="tracking-step" type="button" data-delivery-step="1"><span class="tracking-step-marker">2</span><span class="tracking-step-label">Pedido en camino</span></button></li>
+						<li><button class="tracking-step" type="button" data-delivery-step="2"><span class="tracking-step-marker">3</span><span class="tracking-step-label">Pedido entregado</span></button></li>
+					</ol>
+				</section>
+
+				<section class="receipt-panel" aria-labelledby="receipt-title">
+					<div class="receipt-topline"><span class="receipt-icon" aria-hidden="true">$</span><span>VENTA RECIENTE</span></div>
+					<h2 id="receipt-title">Total a pagar</h2>
+					<p id="purchase-message" class="purchase-message" aria-live="polite">Tu compra aparecerá aquí.</p>
+					<strong id="purchase-total" class="purchase-total">$0.00</strong>
+					<p id="purchase-total-bs" class="purchase-total-bs"></p>
+					<p id="purchase-delivery" class="purchase-delivery"></p>
+				</section>
+			</aside>
+		</div>
+
+		<dialog id="checkout-dialog" class="checkout-dialog" aria-labelledby="checkout-title">
+			<form id="checkout-form">
+				<div class="dialog-heading">
+					<div>
+						<p class="eyebrow">ÚLTIMO PASO</p>
+						<h2 id="checkout-title">¿Cómo deseas pagar?</h2>
+					</div>
+					<button id="close-checkout" class="dialog-close" type="button" aria-label="Cerrar">×</button>
+				</div>
+				<p class="dialog-copy">Elige un método para confirmar esta compra.</p>
+				<fieldset class="payment-options">
+					<legend class="visually-hidden">Método de pago</legend>
+					<label class="payment-option"><input type="radio" name="payment-method" value="Efectivo" required><span class="payment-symbol" aria-hidden="true">$</span><span class="payment-option-copy"><strong>Efectivo</strong><small>Pago al retirar o recibir el pedido</small></span></label>
+					<label class="payment-option"><input type="radio" name="payment-method" value="Pago móvil" required><span class="payment-symbol" aria-hidden="true">↗</span><span class="payment-option-copy"><strong>Pago móvil</strong><small>Teléfono, cédula y banco</small></span></label>
+					<label class="payment-option"><input type="radio" name="payment-method" value="Transferencia" required><span class="payment-symbol" aria-hidden="true">⇄</span><span class="payment-option-copy"><strong>Transferencia</strong><small>Datos de cuenta bancaria</small></span></label>
+				</fieldset>
+				<div id="checkout-delivery" class="checkout-delivery" hidden></div>
+				<div class="dialog-total"><span>Total a pagar</span><span class="cart-total-values"><strong id="checkout-total">$0.00</strong><small id="checkout-total-bs">Tasa en consulta</small></span></div>
+				<p id="checkout-feedback" class="checkout-feedback" role="status" aria-live="polite"></p>
+				<div class="dialog-actions">
+					<button id="cancel-checkout" class="secondary-button" type="button">Seguir comprando</button>
+					<button class="primary-button" type="submit">Ver datos para pagar</button>
+				</div>
+			</form>
+		</dialog>
+
+		<dialog id="payment-details-dialog" class="checkout-dialog payment-detail-dialog" aria-labelledby="payment-detail-title">
+			<div class="payment-detail-header">
+				<div class="payment-detail-icon" id="payment-detail-icon" aria-hidden="true">$</div>
+				<div class="payment-detail-heading">
+					<p class="eyebrow">DATOS PARA TU PAGO</p>
+					<h2 id="payment-detail-title">Método de pago</h2>
+				</div>
+				<button id="close-payment-details" class="dialog-close" type="button" aria-label="Cerrar detalles de pago">×</button>
+			</div>
+			<p id="payment-detail-description" class="dialog-copy"></p>
+			<div id="payment-detail-list" class="payment-detail-list"></div>
+			<p id="payment-detail-note" class="payment-detail-note"></p>
+			<p id="copy-feedback" class="copy-feedback" role="status" aria-live="polite"></p>
+			<div class="payment-detail-total">
+				<span>Total de la compra</span>
+				<span class="cart-total-values"><strong id="payment-detail-total">$0.00</strong><small id="payment-detail-total-bs"></small></span>
+			</div>
+			<div id="payment-detail-delivery" class="checkout-delivery" hidden></div>
+			<div class="payment-detail-actions">
+				<button id="back-to-payment-methods" class="secondary-button" type="button">Volver a métodos</button>
+				<button id="confirm-payment" class="primary-button" type="button">Confirmar compra</button>
+			</div>
+		</dialog>
+
+		<dialog id="map-picker-dialog" class="map-picker-dialog" aria-labelledby="map-picker-title">
+			<div class="map-picker-header">
+				<div class="map-picker-mark" aria-hidden="true">⌖</div>
+				<div class="map-picker-heading">
+					<p class="eyebrow">UBICACIÓN DE ENTREGA</p>
+					<h2 id="map-picker-title">¿Dónde te lo llevamos?</h2>
+				</div>
+				<button id="close-map-picker" class="dialog-close" type="button" aria-label="Cerrar selector de ubicación">×</button>
+			</div>
+			<p class="map-picker-intro">Busca una dirección, explora el mapa o usa tu ubicación actual. Confirma el punto para agregarlo al pedido.</p>
+			<div class="map-picker-tools">
+				<label class="map-picker-search" for="map-picker-input">
+					<span aria-hidden="true">⌕</span>
+					<input id="map-picker-input" type="search" aria-label="Dirección, zona o lugar" placeholder="Dirección, zona o lugar" autocomplete="off">
+				</label>
+				<button id="search-map-location" class="map-search-button" type="button">Buscar</button>
+				<button id="map-picker-current-location" class="location-button" type="button"><span aria-hidden="true">⌖</span> Mi ubicación</button>
+			</div>
+			<div class="map-picker-view">
+				<div class="map-picker-frame-wrap">
+					<div id="map-picker-map" class="map-picker-map" role="application" aria-label="Mapa interactivo. Toca el lugar donde deseas recibir el pedido."></div>
+				</div>
+				<aside class="map-picker-selection">
+					<p class="eyebrow">PUNTO SELECCIONADO</p>
+					<strong id="map-picker-selection-summary">Busca una dirección para empezar</strong>
+					<small id="map-picker-coordinates" class="map-picker-coordinates"></small>
+					<p id="map-picker-feedback" role="status" aria-live="polite">La ubicación confirmada se guardará en los datos de delivery.</p>
+					<a id="open-map-picker-google" class="map-picker-google-link" href="https://www.google.com/maps" target="_blank" rel="noreferrer">Abrir en Google Maps ↗</a>
+				</aside>
+			</div>
+			<div class="map-picker-actions">
+				<button id="cancel-map-picker" class="secondary-button" type="button">Cancelar</button>
+				<button id="confirm-map-location" class="primary-button" type="button">Usar esta ubicación</button>
+			</div>
+		</dialog>
+		<footer class="page-footer"><span>La Tiendita <span class="brand-period">·</span> Inventario sencillo, tienda en orden.</span><span>Los precios mayores a $50 reciben 10% de descuento.</span></footer>
+	</main>
+</body>
+</html>
