@@ -1315,6 +1315,163 @@ async function renderLatestDeliveryTracking() {
 	});
 }
 
+function renderDriverOrderCard(order, isAvailable) {
+	const card = document.createElement("article");
+	card.className = "driver-order-card";
+	const heading = document.createElement("div");
+	heading.className = "driver-order-card-heading";
+	const title = document.createElement("h3");
+	title.textContent = `Pedido · ${new Intl.DateTimeFormat("es-VE", {
+		hour: "2-digit",
+		minute: "2-digit"
+	}).format(new Date(order.created_at))}`;
+	const total = document.createElement("strong");
+	total.textContent = formatMoney(Number(order.total));
+	heading.append(title, total);
+	const customer = document.createElement("p");
+	customer.textContent = `Cliente: ${order.customer_name}`;
+	const items = document.createElement("p");
+	items.className = "driver-order-items";
+	items.textContent = (order.items || []).map((item) =>
+		`${formatQuantity(Number(item.quantity), 3)} ${item.unit} ${item.name}`
+	).join(" · ");
+	const address = document.createElement("p");
+	address.textContent = `Entrega: ${order.delivery_address}`;
+	const locationLink = document.createElement("a");
+	locationLink.className = "driver-map-link";
+	locationLink.href = `https://www.google.com/maps/search/?api=1&query=${order.delivery_latitude},${order.delivery_longitude}`;
+	locationLink.target = "_blank";
+	locationLink.rel = "noreferrer";
+	locationLink.textContent = "Abrir ubicación en Google Maps ↗";
+	card.append(heading, customer, items, address, locationLink);
+	if (order.customer_phone) {
+		const phone = document.createElement("a");
+		phone.className = "driver-customer-phone";
+		phone.href = `tel:${order.customer_phone.replace(/[^\d+]/g, "")}`;
+		phone.textContent = `Llamar al cliente · ${order.customer_phone}`;
+		card.append(phone);
+	}
+	if (isAvailable) {
+		const acceptButton = document.createElement("button");
+		acceptButton.className = "primary-button driver-order-action";
+		acceptButton.type = "button";
+		acceptButton.textContent = "Aceptar pedido";
+		acceptButton.addEventListener("click", () => acceptDriverOrder(order.id, acceptButton));
+		card.append(acceptButton);
+	} else {
+		const nextStatus = {
+			accepted: ["picked_up", "Marcar como recogido"],
+			picked_up: ["on_the_way", "Iniciar entrega"],
+			on_the_way: ["delivered", "Marcar como entregado"]
+		}[order.status];
+		if (nextStatus) {
+			const statusButton = document.createElement("button");
+			statusButton.className = "primary-button driver-order-action";
+			statusButton.type = "button";
+			statusButton.textContent = nextStatus[1];
+			statusButton.addEventListener("click", () => advanceDriverOrder(order.id, nextStatus[0], statusButton));
+			card.append(statusButton);
+		}
+	}
+	return card;
+}
+
+async function refreshDriverOrders() {
+	if (!driverSession) {
+		return;
+	}
+	try {
+		const [pending, active] = await Promise.all([
+			callSupabaseFunction("list_available_delivery_orders", {}, driverSession.access_token),
+			callSupabaseFunction("list_my_delivery_orders", {}, driverSession.access_token)
+		]);
+		availableOrders.replaceChildren(...(pending || []).map((order) => renderDriverOrderCard(order, true)));
+		myDriverOrders.replaceChildren(...(active || []).map((order) => renderDriverOrderCard(order, false)));
+		availableOrdersEmpty.hidden = pending.length > 0;
+		availableOrdersEmpty.textContent = pending.length > 0 ? "" : "No hay pedidos nuevos por aceptar.";
+		myOrdersEmpty.hidden = active.length > 0;
+		myOrdersEmpty.textContent = active.length > 0 ? "" : "Todavía no tienes entregas activas.";
+		driverLoginFeedback.textContent = "";
+	} catch (error) {
+		driverLoginFeedback.textContent = `No se pudieron actualizar los pedidos: ${error.message}`;
+	}
+}
+
+async function acceptDriverOrder(orderId, button) {
+	if (!driverSession) {
+		return;
+	}
+	button.disabled = true;
+	try {
+		await callSupabaseFunction("accept_delivery_order", { p_order_id: orderId }, driverSession.access_token);
+		driverLoginFeedback.textContent = "Pedido aceptado. Ya puedes ver los datos del cliente y actualizar la entrega.";
+		await refreshDriverOrders();
+		await renderLatestDeliveryTracking();
+	} catch (error) {
+		driverLoginFeedback.textContent = `No se pudo aceptar el pedido: ${error.message}`;
+		button.disabled = false;
+		await refreshDriverOrders();
+	}
+}
+
+async function advanceDriverOrder(orderId, status, button) {
+	if (!driverSession) {
+		return;
+	}
+	button.disabled = true;
+	try {
+		await callSupabaseFunction("update_delivery_order_status", {
+			p_order_id: orderId,
+			p_status: status
+		}, driverSession.access_token);
+		await refreshDriverOrders();
+		await renderLatestDeliveryTracking();
+	} catch (error) {
+		driverLoginFeedback.textContent = `No se pudo actualizar la entrega: ${error.message}`;
+		button.disabled = false;
+	}
+}
+
+function renderDriverSession() {
+	const signedIn = Boolean(driverSession);
+	driverLoginForm.hidden = signedIn;
+	driverSessionPanel.hidden = !signedIn;
+	document.querySelector("#driver-setup-notice").hidden = isSupabaseConfigured();
+	if (!isSupabaseConfigured()) {
+		document.querySelector("#driver-setup-notice").textContent = "Para habilitar pedidos entre dispositivos, crea un proyecto Supabase, ejecuta SUPABASE_SETUP.sql y configura su URL y clave pública en FUNCIONAMIENTO.JS.";
+		availableOrdersEmpty.textContent = "Primero configura Supabase.";
+		availableOrdersEmpty.hidden = false;
+		return;
+	}
+	if (!signedIn) {
+		availableOrdersEmpty.textContent = "Inicia sesión para buscar pedidos.";
+		availableOrdersEmpty.hidden = false;
+		myOrdersEmpty.hidden = false;
+		return;
+	}
+	document.querySelector("#driver-session-name").textContent = driverSession.driver?.full_name || driverSession.user?.email || "Conductor";
+	const driver = driverSession.driver;
+	document.querySelector("#driver-session-vehicle").textContent = driver
+		? `${driver.vehicle_make} ${driver.vehicle_model} · ${driver.vehicle_year} · Placa ${driver.plate_number}`
+		: "";
+	void refreshDriverOrders();
+	window.clearInterval(driverOrdersTimer);
+	driverOrdersTimer = window.setInterval(refreshDriverOrders, 10000);
+}
+
+async function signInDriver(email, password) {
+	const result = await supabaseRequest("/auth/v1/token?grant_type=password", {
+		method: "POST",
+		body: { email, password }
+	});
+	if (!result.access_token) {
+		throw new Error("Supabase no devolvió una sesión de conductor.");
+	}
+	driverSession = result;
+	localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(driverSession));
+	await callSupabaseFunction("list_available_delivery_orders", {}, driverSession.access_token);
+}
+
 async function completePurchase(paymentMethod) {
 	const unavailable = cart.some((item) => {
 		const product = products.find((entry) => entry.id === item.productId);
