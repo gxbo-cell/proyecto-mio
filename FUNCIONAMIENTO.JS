@@ -1591,7 +1591,7 @@ function renderDriverSession() {
 	continueDriverRegistrationButton.disabled = !isSupabaseConfigured();
 	document.querySelector("#driver-setup-notice").hidden = isSupabaseConfigured();
 	if (!isSupabaseConfigured()) {
-		document.querySelector("#driver-setup-notice").textContent = "Para habilitar pedidos entre dispositivos, crea un proyecto Supabase, ejecuta SUPABASE_SETUP.sql y configura su URL y clave pública en FUNCIONAMIENTO.JS.";
+		document.querySelector("#driver-setup-notice").textContent = "Para habilitar registros y pedidos, configura Supabase desde Administración. Necesitarás la URL y la clave pública del proyecto y ejecutar SUPABASE_SETUP.sql una vez.";
 		availableOrdersEmpty.textContent = "Primero configura Supabase.";
 		availableOrdersEmpty.hidden = false;
 		return;
@@ -1693,10 +1693,10 @@ async function uploadDriverDocument(documentType, file) {
 	}
 	const objectPath = `${driverSession.user.id}/${documentType}/document`;
 	const encodedPath = objectPath.split("/").map(encodeURIComponent).join("/");
-	const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/driver-documents/${encodedPath}`, {
+	const response = await fetch(`${supabaseConfig.url.replace(/\/$/, "")}/storage/v1/object/driver-documents/${encodedPath}`, {
 		method: "POST",
 		headers: {
-			apikey: SUPABASE_ANON_KEY,
+			apikey: supabaseConfig.anonKey,
 			Authorization: "Bearer " + driverSession.access_token,
 			"Content-Type": file.type,
 			"x-upsert": "true"
@@ -2007,9 +2007,13 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 			renderDriverSession();
 		} else if (button.dataset.viewTarget === "shopping-view" && latestDelivery) {
 			void renderLatestDeliveryTracking();
+		} else if (button.dataset.viewTarget === "admin-view") {
+			renderSupabaseConfiguration();
 		}
 	});
 });
+supabaseSetupForm.addEventListener("submit", configureSupabase);
+supabaseSetupClearButton.addEventListener("click", disconnectSupabase);
 driverLoginForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	driverLoginFeedback.textContent = "Verificando la cuenta de conductor...";
@@ -2189,5 +2193,6 @@ if (latestDelivery) {
 renderProducts();
 renderCart();
 configureProductFormMode();
+renderSupabaseConfiguration();
 renderDriverSession();
 loadDailyRate();
