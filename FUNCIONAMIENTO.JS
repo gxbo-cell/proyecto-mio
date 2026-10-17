@@ -1033,11 +1033,6 @@ function openCheckout() {
 		openMapPickerButton.focus();
 		return;
 	}
-	if (deliveryToggle.checked && !deliveryAddress.value.trim()) {
-		deliveryFeedback.textContent = "Añade la dirección o una referencia para la entrega.";
-		deliveryAddress.focus();
-		return;
-	}
 	deliveryFeedback.textContent = "";
 	checkoutFeedback.textContent = "";
 	checkoutForm.reset();
@@ -1688,7 +1683,7 @@ deliveryMapLink.addEventListener("input", () => {
 	deliveryCoordinates = validLink ? getCoordinatesFromMapLink(validLink) : null;
 	if (deliveryCoordinates) {
 		updateDeliveryEstimate();
-		mapFeedback.textContent = "Ubicación de Google Maps reconocida. Abre el selector para verificar el pin.";
+		mapFeedback.textContent = "Ubicación reconocida y costo calculado. Puedes verificar el pin en el mapa.";
 	} else {
 		updateDeliveryEstimate();
 		mapFeedback.textContent = deliveryMapLink.value.trim() && !validLink
