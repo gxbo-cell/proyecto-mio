@@ -303,20 +303,22 @@ function renderProducts() {
 
 	for (const product of visibleProducts) {
 		const discountedPrice = getDiscountedPrice(product.price);
+		const weightProduct = isWeightProduct(product);
 		const card = document.createElement("article");
+		const lowStock = product.stock > 0 && product.stock <= (weightProduct ? 3000 : 3);
 		card.className = `product-card${product.stock === 0 ? " product-card-soldout" : ""}`;
 		const visual = document.createElement("div");
 		visual.className = `product-card-visual category-${product.category.toLocaleLowerCase("es").replace("á", "a").replace("é", "e")}`;
 		visual.setAttribute("aria-hidden", "true");
-		visual.textContent = ({ Carnes: "🥩", Víveres: "🛒", Bebidas: "🥤", "Lácteos": "🥛", Otros: "🌿" })[product.category];
+		visual.textContent = ({ Carnes: "🥩", "Charcutería": "🧀", Víveres: "🛒", Bebidas: "🥤", "Lácteos": "🥛", Otros: "🌿" })[product.category];
 		const details = document.createElement("div");
 		details.className = "product-card-details";
 		const category = document.createElement("span");
 		category.className = "product-category-label";
 		category.textContent = product.category;
 		const status = document.createElement("span");
-		status.className = `product-status${product.stock === 0 ? " sold-out" : product.stock <= 3 ? " low-stock" : ""}`;
-		status.textContent = product.stock === 0 ? "Agotado" : product.stock <= 3 ? "Pocas unidades" : "Disponible";
+		status.className = `product-status${product.stock === 0 ? " sold-out" : lowStock ? " low-stock" : ""}`;
+		status.textContent = product.stock === 0 ? "Agotado" : lowStock ? "Pocas unidades" : "Disponible";
 		const name = document.createElement("h3");
 		name.className = "product-card-name";
 		name.textContent = product.name;
@@ -329,7 +331,7 @@ function renderProducts() {
 			price.append(originalPrice);
 		}
 		const currentPrice = document.createElement("strong");
-		currentPrice.textContent = formatMoney(discountedPrice);
+		currentPrice.textContent = `${formatMoney(discountedPrice)}${weightProduct ? " / kg" : ""}`;
 		price.append(currentPrice);
 		if (discountedPrice < product.price) {
 			const discountTag = document.createElement("span");
@@ -346,22 +348,59 @@ function renderProducts() {
 		const controls = document.createElement("div");
 		controls.className = "product-card-controls";
 		const quantityInput = document.createElement("input");
-		quantityInput.className = "buy-quantity";
+		quantityInput.className = `buy-quantity${weightProduct ? " weight-quantity" : ""}`;
 		quantityInput.type = "number";
-		quantityInput.min = "1";
 		const availableStock = product.stock - getCartQuantity(product.id);
-		quantityInput.max = String(Math.max(1, availableStock));
-		quantityInput.value = "1";
-		quantityInput.setAttribute("aria-label", `Cantidad de ${product.name} para añadir al carrito`);
+		let unitSelect;
+		if (weightProduct) {
+			unitSelect = document.createElement("select");
+			unitSelect.className = "weight-unit-select";
+			unitSelect.setAttribute("aria-label", `Unidad de peso para ${product.name}`);
+			for (const unit of ["g", "kg", "lb"]) {
+				const option = document.createElement("option");
+				option.value = unit;
+				option.textContent = unit;
+				option.selected = unit === "kg";
+				unitSelect.append(option);
+			}
+			quantityInput.min = WEIGHT_UNITS.kg.minimum;
+			quantityInput.step = WEIGHT_UNITS.kg.step;
+			quantityInput.max = String(Math.max(0.001, availableStock / GRAMS_PER_KILOGRAM));
+			quantityInput.value = String(Math.min(0.25, availableStock / GRAMS_PER_KILOGRAM));
+			quantityInput.setAttribute("aria-label", `Peso de ${product.name} para añadir al carrito`);
+			unitSelect.addEventListener("change", () => {
+				const previousUnit = unitSelect.dataset.previousUnit || "kg";
+				const amountInGrams = getWeightQuantityInGrams(quantityInput.value, previousUnit);
+				const nextUnit = unitSelect.value;
+				const conversion = WEIGHT_UNITS[nextUnit];
+				quantityInput.step = conversion.step;
+				quantityInput.min = conversion.minimum;
+				quantityInput.max = String(Math.max(Number(conversion.minimum), availableStock / conversion.grams));
+				quantityInput.value = amountInGrams
+					? String(Math.max(Number(conversion.minimum), amountInGrams / conversion.grams))
+					: conversion.minimum;
+				unitSelect.dataset.previousUnit = nextUnit;
+			});
+		} else {
+			quantityInput.min = "1";
+			quantityInput.step = "1";
+			quantityInput.max = String(Math.max(1, availableStock));
+			quantityInput.value = "1";
+			quantityInput.setAttribute("aria-label", `Cantidad de ${product.name} para añadir al carrito`);
+		}
 		const buyButton = document.createElement("button");
 		buyButton.className = "buy-button";
 		buyButton.type = "button";
 		buyButton.textContent = product.stock === 0 ? "Agotado" : "Añadir al carrito";
 		buyButton.disabled = product.stock === 0 || availableStock === 0;
 		buyButton.addEventListener("click", () => {
-			addToCart(product.id, quantityInput.value);
+			addToCart(product.id, quantityInput.value, unitSelect?.value);
 		});
-		controls.append(quantityInput, buyButton);
+		controls.append(quantityInput);
+		if (unitSelect) {
+			controls.append(unitSelect);
+		}
+		controls.append(buyButton);
 		card.append(visual, details, controls);
 		catalogProducts.append(card);
 	}
@@ -370,9 +409,16 @@ function renderProducts() {
 	noResults.hidden = products.length === 0 || visibleProducts.length > 0;
 	renderAdminProducts();
 	document.querySelector("#product-count").textContent = String(products.length);
-	document.querySelector("#unit-count").textContent = String(
-		products.reduce((total, product) => total + product.stock, 0)
-	);
+	const unitStock = products
+		.filter((product) => !isWeightProduct(product))
+		.reduce((total, product) => total + product.stock, 0);
+	const weightStock = products
+		.filter(isWeightProduct)
+		.reduce((total, product) => total + product.stock, 0);
+	document.querySelector("#unit-count").textContent = [
+		unitStock ? `${unitStock} uds` : "",
+		weightStock ? formatWeight(weightStock) : ""
+	].filter(Boolean).join(" · ") || "0";
 	document.querySelector("#out-of-stock-count").textContent = String(
 		products.filter((product) => product.stock === 0).length
 	);
@@ -383,7 +429,7 @@ function renderProducts() {
 		? ""
 		: `${exhaustedCount} ${exhaustedCount === 1 ? "producto agotado requiere" : "productos agotados requieren"} reposición. Filtra el inventario para revisarlos.`;
 	document.querySelector("#inventory-value").textContent = formatMoney(
-		products.reduce((total, product) => total + getDiscountedPrice(product.price) * product.stock, 0)
+		products.reduce((total, product) => total + getCartLineTotal(product, product.stock), 0)
 	);
 }
 
@@ -395,7 +441,7 @@ function renderAdminProducts() {
 		const matchesStock = filter === "all" ||
 			(filter === "available" && product.stock > 0) ||
 			(filter === "out" && product.stock === 0) ||
-			(filter === "low" && product.stock > 0 && product.stock <= 3);
+			(filter === "low" && product.stock > 0 && product.stock <= (isWeightProduct(product) ? 3000 : 3));
 		return matchesName && matchesStock;
 	});
 	productList.replaceChildren();
@@ -408,22 +454,23 @@ function renderAdminProducts() {
 		categoryCell.textContent = product.category;
 		const priceCell = document.createElement("td");
 		priceCell.className = "price-cell";
-		priceCell.textContent = formatMoney(product.price);
+		priceCell.textContent = `${formatMoney(product.price)}${isWeightProduct(product) ? " / kg" : " c/u"}`;
 		const stockCell = document.createElement("td");
 		const stockInput = document.createElement("input");
 		stockInput.className = "stock-edit-input";
 		stockInput.type = "number";
 		stockInput.min = "0";
-		stockInput.step = "1";
-		stockInput.value = String(product.stock);
-		stockInput.setAttribute("aria-label", `Existencias de ${product.name}`);
+		stockInput.step = isWeightProduct(product) ? "0.001" : "1";
+		stockInput.value = String(getStockAmount(product));
+		stockInput.setAttribute("aria-label", `Existencias de ${product.name}${isWeightProduct(product) ? " en kg" : " en unidades"}`);
 		stockCell.append(stockInput);
 		const actionCell = document.createElement("td");
 		const actionWrap = document.createElement("div");
 		actionWrap.className = "inventory-actions";
 		const status = document.createElement("span");
-		status.className = `stock-pill${product.stock <= 3 ? " low" : ""}`;
-		status.textContent = product.stock === 0 ? "Agotado" : product.stock <= 3 ? "Stock bajo" : "En stock";
+		const lowStock = product.stock > 0 && product.stock <= (isWeightProduct(product) ? 3000 : 3);
+		status.className = `stock-pill${lowStock ? " low" : ""}`;
+		status.textContent = product.stock === 0 ? "Agotado" : lowStock ? "Stock bajo" : "En stock";
 		const editButton = document.createElement("button");
 		editButton.className = "inventory-action-button";
 		editButton.type = "button";
