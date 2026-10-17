@@ -1479,8 +1479,11 @@ async function advanceDriverOrder(orderId, status, button) {
 
 function renderDriverSession() {
 	const signedIn = Boolean(driverSession);
+	const driver = driverSession?.driver;
 	driverLoginForm.hidden = signedIn;
 	driverSessionPanel.hidden = !signedIn;
+	openDriverRegistrationButton.hidden = signedIn || !isSupabaseConfigured();
+	continueDriverRegistrationButton.hidden = !signedIn || Boolean(driver) || !isSupabaseConfigured();
 	document.querySelector("#driver-setup-notice").hidden = isSupabaseConfigured();
 	if (!isSupabaseConfigured()) {
 		document.querySelector("#driver-setup-notice").textContent = "Para habilitar pedidos entre dispositivos, crea un proyecto Supabase, ejecuta SUPABASE_SETUP.sql y configura su URL y clave pública en FUNCIONAMIENTO.JS.";
@@ -1494,13 +1497,24 @@ function renderDriverSession() {
 		myOrdersEmpty.hidden = false;
 		return;
 	}
-	document.querySelector("#driver-session-name").textContent = driverSession.driver?.full_name || driverSession.user?.email || "Conductor";
-	const driver = driverSession.driver;
+	window.clearInterval(driverOrdersTimer);
+	if (!driver) {
+		document.querySelector("#driver-session-name").textContent = driverSession.user?.email || "Cuenta de conductor";
+		document.querySelector("#driver-session-vehicle").textContent = "";
+		document.querySelector("#driver-registration-status").textContent = "Tu cuenta existe, pero el perfil no está completo. Envía los datos y los cuatro documentos requeridos para habilitar pedidos.";
+		availableOrders.replaceChildren();
+		myDriverOrders.replaceChildren();
+		availableOrdersEmpty.textContent = "Completa el registro para acceder a pedidos.";
+		availableOrdersEmpty.hidden = false;
+		myOrdersEmpty.hidden = false;
+		return;
+	}
+	document.querySelector("#driver-registration-status").textContent = "";
+	document.querySelector("#driver-session-name").textContent = driver.full_name || driverSession.user?.email || "Conductor";
 	document.querySelector("#driver-session-vehicle").textContent = driver
-		? `${driver.vehicle_make} ${driver.vehicle_model} · ${driver.vehicle_year} · Placa ${driver.plate_number}`
+		? `${driver.vehicle_make} ${driver.vehicle_model} · ${driver.vehicle_year} · Placa ${driver.plate_number}${driver.vehicle_color ? ` · ${driver.vehicle_color}` : ""}`
 		: "";
 	void refreshDriverOrders();
-	window.clearInterval(driverOrdersTimer);
 	driverOrdersTimer = window.setInterval(refreshDriverOrders, 10000);
 }
 
@@ -1908,13 +1922,28 @@ driverLoginForm.addEventListener("submit", async (event) => {
 		loginButton.disabled = false;
 	}
 });
+openDriverRegistrationButton.addEventListener("click", () => {
+	configureDriverRegistrationForm();
+	driverRegistrationFeedback.textContent = "";
+	driverRegistrationDialog.showModal();
+});
+continueDriverRegistrationButton.addEventListener("click", () => {
+	configureDriverRegistrationForm();
+	driverRegistrationFeedback.textContent = "";
+	driverRegistrationDialog.showModal();
+});
+driverRegistrationForm.addEventListener("submit", registerDriver);
+document.querySelector("#close-driver-registration").addEventListener("click", () => driverRegistrationDialog.close());
+document.querySelector("#cancel-driver-registration").addEventListener("click", () => driverRegistrationDialog.close());
 document.querySelector("#driver-logout").addEventListener("click", () => {
 	driverSession = null;
 	window.clearInterval(driverOrdersTimer);
+	driverOrdersTimer = null;
 	localStorage.removeItem(DRIVER_SESSION_KEY);
 	availableOrders.replaceChildren();
 	myDriverOrders.replaceChildren();
 	driverLoginFeedback.textContent = "Sesión cerrada.";
+	document.querySelector("#driver-registration-status").textContent = "";
 	renderDriverSession();
 });
 document.querySelector("#refresh-driver-orders").addEventListener("click", refreshDriverOrders);
