@@ -1233,12 +1233,15 @@ function loadGoogleMapsApi() {
 	return googleMapsApiPromise;
 }
 
+window.gm_authFailure = () => {
+	googleMapsAuthFailed = true;
+	mapPickerFeedback.textContent = "Google Maps rechazó la clave. Verifica las API habilitadas y la restricción del dominio.";
+	mapBusinessFeedback.textContent = "No se pudieron cargar los comercios de Google Maps.";
+};
+
 async function initializeGoogleMap() {
 	await loadGoogleMapsApi();
-	const [{ Map }, { Place }] = await Promise.all([
-		window.google.maps.importLibrary("maps"),
-		window.google.maps.importLibrary("places")
-	]);
+	const { Map } = await window.google.maps.importLibrary("maps");
 	const center = mapPickerCoordinates || DELIVERY_ORIGIN;
 	mapPickerMap = new Map(mapPickerMapElement, {
 		center: { lat: center.latitude, lng: center.longitude },
@@ -1561,7 +1564,7 @@ async function selectGooglePlace(placeId) {
 		await setMapPickerSelection({
 			lat: place.location.lat(),
 			lng: place.location.lng()
-		}, false, place.formattedAddress || place.displayName?.text);
+		}, false, place.formattedAddress || place.displayName);
 	} catch (error) {
 		mapPickerFeedback.textContent = `No se pudo abrir ese lugar de Google Maps: ${error.message}`;
 	}
@@ -1586,7 +1589,7 @@ async function selectMapSuggestion(index) {
 				await setMapPickerSelection({
 					lat: googlePlace.location.lat(),
 					lng: googlePlace.location.lng()
-				}, false, googlePlace.formattedAddress || googlePlace.displayName?.text);
+				}, false, googlePlace.formattedAddress || googlePlace.displayName);
 			} catch (error) {
 				mapPickerFeedback.textContent = `No se pudo cargar el lugar: ${error.message}`;
 			}
