@@ -1125,9 +1125,18 @@ function getCoordinatesFromMapLink(mapLink) {
 }
 
 function updateDeliveryMap() {
-	const query = getMapSearchQuery();
-	if (query) {
-		deliveryMapPreview.src = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`;
+	const coordinates = deliveryCoordinates || getCoordinatesFromMapLink(getValidatedMapLink());
+	if (coordinates) {
+		const mapUrl = new URL("https://www.openstreetmap.org/export/embed.html");
+		mapUrl.searchParams.set("bbox", [
+			coordinates.longitude - 0.01,
+			coordinates.latitude - 0.01,
+			coordinates.longitude + 0.01,
+			coordinates.latitude + 0.01
+		].join(","));
+		mapUrl.searchParams.set("layer", "mapnik");
+		mapUrl.searchParams.set("marker", `${coordinates.latitude},${coordinates.longitude}`);
+		deliveryMapPreview.src = mapUrl.href;
 		deliveryMapPreview.hidden = false;
 	} else {
 		deliveryMapPreview.removeAttribute("src");
