@@ -555,12 +555,16 @@ function deleteProduct(productId) {
 	renderCart();
 }
 
-function addToCart(productId, requestedQuantity) {
+function addToCart(productId, requestedQuantity, weightUnit) {
 	const product = products.find((item) => item.id === productId);
-	const quantity = Number(requestedQuantity);
+	const quantity = product && isWeightProduct(product)
+		? getWeightQuantityInGrams(requestedQuantity, weightUnit)
+		: Number(requestedQuantity);
 	const alreadyInCart = getCartQuantity(productId);
 	if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity + alreadyInCart > product.stock) {
-		showFeedback("La cantidad supera las unidades disponibles.", true);
+		showFeedback(product && isWeightProduct(product)
+			? `Indica un peso válido, en existencias y mayor a 1 g (${formatWeight(Math.max(0, product.stock - alreadyInCart))} disponibles).`
+			: "La cantidad supera las unidades disponibles.", true);
 		return;
 	}
 
@@ -576,10 +580,16 @@ function addToCart(productId, requestedQuantity) {
 }
 
 
-function updateCartQuantity(productId, requestedQuantity) {
+function updateCartQuantity(productId, requestedQuantity, weightUnit) {
 	const product = products.find((item) => item.id === productId);
-	const quantity = Number(requestedQuantity);
+	const quantity = product && isWeightProduct(product)
+		? getWeightQuantityInGrams(requestedQuantity, weightUnit)
+		: Number(requestedQuantity);
 	if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > product.stock) {
+		renderCart();
+		showFeedback(product && isWeightProduct(product)
+			? `El peso indicado no es válido o supera las existencias de ${formatWeight(product?.stock || 0)}.`
+			: "La cantidad indicada supera las unidades disponibles.", true);
 		return;
 	}
 	const cartItem = cart.find((item) => item.productId === productId);
@@ -598,14 +608,14 @@ function removeFromCart(productId) {
 
 function renderCart() {
 	cartItems.replaceChildren();
-	let totalQuantity = 0;
 
 	for (const item of cart) {
 		const product = products.find((entry) => entry.id === item.productId);
 		if (!product) {
 			continue;
 		}
-		totalQuantity += item.quantity;
+		const weightProduct = isWeightProduct(product);
+		const lineTotal = getCartLineTotal(product, item.quantity);
 		const line = document.createElement("li");
 		line.className = "cart-item";
 		const info = document.createElement("div");
@@ -615,19 +625,55 @@ function renderCart() {
 		name.textContent = product.name;
 		const linePrice = document.createElement("span");
 		linePrice.className = "cart-item-price";
-		linePrice.textContent = `${formatMoney(getDiscountedPrice(product.price))} c/u · ${formatMoney(getDiscountedPrice(product.price) * item.quantity)} · ${formatBolivars(getDiscountedPrice(product.price) * item.quantity)}`;
+		linePrice.textContent = weightProduct
+			? `${formatMoney(getDiscountedPrice(product.price))}/kg · ${formatWeight(item.quantity)} · ${formatMoney(lineTotal)} · ${formatBolivars(lineTotal)}`
+			: `${formatMoney(getDiscountedPrice(product.price))} c/u · ${formatMoney(lineTotal)} · ${formatBolivars(lineTotal)}`;
 		info.append(name, linePrice);
 
 		const controls = document.createElement("div");
-		controls.className = "cart-item-controls";
+		controls.className = `cart-item-controls${weightProduct ? " cart-weight-controls" : ""}`;
 		const quantityInput = document.createElement("input");
-		quantityInput.className = "cart-item-quantity";
+		quantityInput.className = `cart-item-quantity${weightProduct ? " weight-quantity" : ""}`;
 		quantityInput.type = "number";
-		quantityInput.min = "1";
-		quantityInput.max = String(product.stock);
-		quantityInput.value = String(item.quantity);
-		quantityInput.setAttribute("aria-label", `Cantidad de ${product.name} en el carrito`);
-		quantityInput.addEventListener("change", () => updateCartQuantity(product.id, quantityInput.value));
+		let unitSelect;
+		if (weightProduct) {
+			unitSelect = document.createElement("select");
+			unitSelect.className = "weight-unit-select cart-weight-unit-select";
+			unitSelect.setAttribute("aria-label", `Unidad de peso de ${product.name} en el carrito`);
+			for (const unit of ["g", "kg", "lb"]) {
+				const option = document.createElement("option");
+				option.value = unit;
+				option.textContent = unit;
+				option.selected = unit === "kg";
+				unitSelect.append(option);
+			}
+			quantityInput.min = WEIGHT_UNITS.kg.minimum;
+			quantityInput.step = WEIGHT_UNITS.kg.step;
+			quantityInput.max = String(Math.max(0.001, product.stock / GRAMS_PER_KILOGRAM));
+			quantityInput.value = String(item.quantity / GRAMS_PER_KILOGRAM);
+			quantityInput.setAttribute("aria-label", `Peso de ${product.name} en el carrito`);
+			unitSelect.addEventListener("change", () => {
+				const previousUnit = unitSelect.dataset.previousUnit || "kg";
+				const amountInGrams = getWeightQuantityInGrams(quantityInput.value, previousUnit);
+				const nextUnit = unitSelect.value;
+				const conversion = WEIGHT_UNITS[nextUnit];
+				quantityInput.step = conversion.step;
+				quantityInput.min = conversion.minimum;
+				quantityInput.max = String(Math.max(Number(conversion.minimum), product.stock / conversion.grams));
+				quantityInput.value = amountInGrams
+					? String(Math.max(Number(conversion.minimum), amountInGrams / conversion.grams))
+					: conversion.minimum;
+				unitSelect.dataset.previousUnit = nextUnit;
+			});
+		} else {
+			quantityInput.min = "1";
+			quantityInput.step = "1";
+			quantityInput.max = String(product.stock);
+			quantityInput.value = String(item.quantity);
+			quantityInput.setAttribute("aria-label", `Cantidad de ${product.name} en el carrito`);
+		}
+		quantityInput.addEventListener("change", () => updateCartQuantity(product.id, quantityInput.value, unitSelect?.value));
+		unitSelect?.addEventListener("change", () => updateCartQuantity(product.id, quantityInput.value, unitSelect.value));
 		const removeButton = document.createElement("button");
 		removeButton.className = "remove-item";
 		removeButton.type = "button";
@@ -635,13 +681,17 @@ function renderCart() {
 		removeButton.title = `Quitar ${product.name} del carrito`;
 		removeButton.setAttribute("aria-label", `Quitar ${product.name} del carrito`);
 		removeButton.addEventListener("click", () => removeFromCart(product.id));
-		controls.append(quantityInput, removeButton);
+		controls.append(quantityInput);
+		if (unitSelect) {
+			controls.append(unitSelect);
+		}
+		controls.append(removeButton);
 		line.append(info, controls);
 		cartItems.append(line);
 	}
 
 	const total = getOrderTotal();
-	cartCount.textContent = String(totalQuantity);
+	cartCount.textContent = String(cart.length);
 	cartEmpty.hidden = cart.length > 0;
 	cartItems.hidden = cart.length === 0;
 	cartTotal.textContent = formatMoney(total);
