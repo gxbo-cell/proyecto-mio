@@ -1513,15 +1513,171 @@ async function signInDriver(email, password) {
 		throw new Error("Supabase no devolvió una sesión de conductor.");
 	}
 	const driver = await callSupabaseFunction("get_my_driver_profile", {}, result.access_token);
-	if (!driver) {
-		throw new Error("Esta cuenta no tiene un perfil de conductor activo. Contacta a la tienda.");
-	}
 	result.driver = driver;
 	driverSession = result;
 	try {
 		localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(driverSession));
 	} catch {
-		throw new Error("El inicio de sesión funcionó, pero no se pudo guardar la sesión en este navegador.");
+		driverLoginFeedback.textContent = "La sesión está activa, pero no se pudo guardar en este navegador.";
+	}
+}
+
+function configureDriverRegistrationForm() {
+	const signedIn = Boolean(driverSession);
+	registrationAccountFields.hidden = signedIn;
+	registrationEmailInput.required = !signedIn;
+	registrationPasswordInput.required = !signedIn;
+	if (signedIn && driverSession.user?.email) {
+		registrationEmailInput.value = driverSession.user.email;
+	}
+	const today = new Date().toISOString().slice(0, 10);
+	document.querySelector("#registration-license-expiry").min = today;
+	document.querySelector("#registration-insurance-expiry").min = today;
+	document.querySelector("#registration-vehicle-year").max = String(new Date().getFullYear() + 1);
+}
+
+function getDriverRegistrationPayload() {
+	const value = (id) => document.querySelector(`#${id}`).value.trim();
+	return {
+		p_full_name: value("registration-full-name"),
+		p_phone: value("registration-phone"),
+		p_national_id: value("registration-national-id"),
+		p_birth_date: value("registration-birth-date"),
+		p_license_number: value("registration-license-number"),
+		p_license_class: value("registration-license-class"),
+		p_license_expires_on: value("registration-license-expiry"),
+		p_emergency_contact_name: value("registration-emergency-name"),
+		p_emergency_contact_phone: value("registration-emergency-phone"),
+		p_plate_number: value("registration-plate"),
+		p_vehicle_make: value("registration-vehicle-make"),
+		p_vehicle_model: value("registration-vehicle-model"),
+		p_vehicle_year: Number(value("registration-vehicle-year")),
+		p_vehicle_color: value("registration-vehicle-color"),
+		p_vehicle_registration_number: value("registration-vehicle-registration"),
+		p_insurance_company: value("registration-insurance-company"),
+		p_insurance_policy_number: value("registration-insurance-policy"),
+		p_insurance_expires_on: value("registration-insurance-expiry")
+	};
+}
+
+async function uploadDriverDocument(documentType, file) {
+	const extensions = {
+		"image/jpeg": "jpg",
+		"image/png": "png",
+		"image/webp": "webp",
+		"application/pdf": "pdf"
+	};
+	const extension = extensions[file.type];
+	if (!extension || file.size === 0 || file.size > 8 * 1024 * 1024) {
+		throw new Error("Cada documento debe ser JPG, PNG, WebP o PDF y no superar 8 MB.");
+	}
+	const objectPath = `${driverSession.user.id}/${documentType}/${crypto.randomUUID()}.${extension}`;
+	const encodedPath = objectPath.split("/").map(encodeURIComponent).join("/");
+	const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/driver-documents/${encodedPath}`, {
+		method: "POST",
+		headers: {
+			apikey: SUPABASE_ANON_KEY,
+			Authorization: "Bearer " + driverSession.access_token,
+			"Content-Type": file.type,
+			"x-upsert": "true"
+		},
+		body: file
+	});
+	const responseText = await response.text();
+	let result = null;
+	if (responseText) {
+		try {
+			result = JSON.parse(responseText);
+		} catch {
+			throw new Error("El servicio de documentos devolvió una respuesta no válida.");
+		}
+	}
+	if (!response.ok) {
+		throw new Error(result?.message || result?.error || `No se pudo cargar un documento (${response.status}).`);
+	}
+	await callSupabaseFunction("record_my_driver_document", {
+		p_document_type: documentType,
+		p_object_path: objectPath
+	}, driverSession.access_token);
+}
+
+async function registerDriver(event) {
+	event.preventDefault();
+	if (!driverRegistrationForm.reportValidity()) {
+		return;
+	}
+	if (!isSupabaseConfigured()) {
+		driverRegistrationFeedback.textContent = "Configura Supabase para crear una cuenta y enviar documentos de forma privada.";
+		return;
+	}
+	const files = [
+		["identity", document.querySelector("#registration-document-id").files[0]],
+		["license", document.querySelector("#registration-document-license").files[0]],
+		["vehicle_registration", document.querySelector("#registration-document-vehicle").files[0]],
+		["insurance", document.querySelector("#registration-document-insurance").files[0]]
+	];
+	if (files.some(([, file]) => !file)) {
+		driverRegistrationFeedback.textContent = "Adjunta los cuatro documentos solicitados.";
+		return;
+	}
+	if (files.some(([, file]) => !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type) ||
+		file.size === 0 || file.size > 8 * 1024 * 1024)) {
+		driverRegistrationFeedback.textContent = "Cada documento debe ser JPG, PNG, WebP o PDF y no superar 8 MB.";
+		return;
+	}
+	const submitButton = driverRegistrationForm.querySelector('button[type="submit"]');
+	submitButton.disabled = true;
+	driverRegistrationFeedback.textContent = "Validando cuenta y documentos...";
+	try {
+		if (!driverSession) {
+			const result = await supabaseRequest("/auth/v1/signup", {
+				method: "POST",
+				body: {
+					email: registrationEmailInput.value.trim(),
+					password: registrationPasswordInput.value
+				}
+			});
+			if (!result.access_token || !result.user?.id) {
+				driverRegistrationFeedback.textContent = "Se creó la cuenta. Confirma tu correo y luego inicia sesión en el portal para completar el perfil y adjuntar los documentos.";
+				return;
+			}
+			driverSession = result;
+			driverSession.driver = null;
+			localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(driverSession));
+			configureDriverRegistrationForm();
+		}
+
+		const profileSaved = await callSupabaseFunction(
+			"register_my_driver_profile",
+			getDriverRegistrationPayload(),
+			driverSession.access_token
+		);
+		if (profileSaved !== true) {
+			throw new Error("No se pudo guardar el perfil del conductor.");
+		}
+		driverRegistrationFeedback.textContent = "Perfil guardado. Cargando documentos privados...";
+		for (const [documentType, file] of files) {
+			await uploadDriverDocument(documentType, file);
+		}
+		const activated = await callSupabaseFunction("activate_my_driver_profile", {}, driverSession.access_token);
+		if (activated !== true) {
+			throw new Error("No se pudo activar el perfil después de cargar los documentos.");
+		}
+		const driver = await callSupabaseFunction("get_my_driver_profile", {}, driverSession.access_token);
+		if (!driver) {
+			throw new Error("El perfil se activó, pero no se pudo recuperar. Inicia sesión nuevamente.");
+		}
+		driverSession.driver = driver;
+		localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(driverSession));
+		driverRegistrationForm.reset();
+		driverRegistrationDialog.close();
+		driverLoginFeedback.textContent = "Registro completo. Ya puedes recibir pedidos.";
+		renderDriverSession();
+	} catch (error) {
+		driverRegistrationFeedback.textContent = `No se pudo completar el registro: ${error.message} Si la carga se interrumpió, vuelve a iniciar sesión y envía el formulario para reintentar.`;
+		renderDriverSession();
+	} finally {
+		submitButton.disabled = false;
 	}
 }
 
