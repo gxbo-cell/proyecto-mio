@@ -72,7 +72,7 @@ const deliveryAddress = document.querySelector("#delivery-address");
 const deliveryFeedback = document.querySelector("#delivery-feedback");
 const checkoutDelivery = document.querySelector("#checkout-delivery");
 const deliveryMapLink = document.querySelector("#delivery-map-link");
-const deliveryMapPreview = document.querySelector("#delivery-map-preview");
+const deliveryMapLinkPreview = document.querySelector("#delivery-map-link-preview");
 const mapFeedback = document.querySelector("#map-feedback");
 const openMapPickerButton = document.querySelector("#open-google-maps");
 const useCurrentLocationButton = document.querySelector("#use-current-location");
@@ -1126,16 +1126,22 @@ function getCoordinatesFromMapLink(mapLink) {
 
 function updateDeliveryMap() {
 	const coordinates = deliveryCoordinates || getCoordinatesFromMapLink(getValidatedMapLink());
-	if (coordinates) {
-		const mapUrl = new URL("https://maps.google.com/maps");
-		mapUrl.searchParams.set("q", `${coordinates.latitude},${coordinates.longitude}`);
-		mapUrl.searchParams.set("z", "16");
-		mapUrl.searchParams.set("output", "embed");
-		deliveryMapPreview.src = mapUrl.href;
-		deliveryMapPreview.hidden = false;
+	const mapLink = getValidatedMapLink();
+	const searchQuery = coordinates
+		? `${coordinates.latitude},${coordinates.longitude}`
+		: deliveryAddress.value.trim();
+	if (mapLink && !coordinates) {
+		deliveryMapLinkPreview.href = mapLink;
+		deliveryMapLinkPreview.hidden = false;
+	} else if (searchQuery) {
+		const mapUrl = new URL("https://www.google.com/maps/search/");
+		mapUrl.searchParams.set("api", "1");
+		mapUrl.searchParams.set("query", searchQuery);
+		deliveryMapLinkPreview.href = mapUrl.href;
+		deliveryMapLinkPreview.hidden = false;
 	} else {
-		deliveryMapPreview.removeAttribute("src");
-		deliveryMapPreview.hidden = true;
+		deliveryMapLinkPreview.removeAttribute("href");
+		deliveryMapLinkPreview.hidden = true;
 	}
 }
 
