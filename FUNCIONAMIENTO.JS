@@ -1079,7 +1079,7 @@ function getValidatedMapLink() {
 		const isShortGoogleMapsLink = hostname === "maps.app.goo.gl" ||
 			hostname === "goo.gl" && url.pathname.startsWith("/maps");
 		const isRegionalGoogleMapsLink = /^(?:(?:www\.)?google|maps\.google)\.(?:com(?:\.[a-z]{2})?|[a-z]{2,3}(?:\.[a-z]{2})?)$/.test(hostname) &&
-			url.pathname.startsWith("/maps");
+			(hostname.startsWith("maps.google.") || url.pathname.startsWith("/maps"));
 		const isGoogleMaps = isShortGoogleMapsLink || isRegionalGoogleMapsLink;
 		return url.protocol === "https:" && isGoogleMaps ? url.href : "";
 	} catch {
@@ -1692,9 +1692,9 @@ deliveryMapLink.addEventListener("input", () => {
 	} else {
 		updateDeliveryEstimate();
 		mapFeedback.textContent = deliveryMapLink.value.trim() && !validLink
-			? "Pega un enlace https válido de Google Maps."
+			? "Pega un enlace https de Google Maps, como maps.app.goo.gl o el dominio regional de Google."
 			: validLink
-				? "El enlace no incluye coordenadas visibles. Ábrelo en Google Maps y marca el pin en el selector."
+				? "Enlace aceptado. Abre «Elegir en el mapa» y marca el punto para calcular el delivery; los enlaces cortos no incluyen coordenadas."
 				: "Escribe una dirección, usa GPS o pega un enlace de Google Maps.";
 	}
 	updateDeliveryMap();
