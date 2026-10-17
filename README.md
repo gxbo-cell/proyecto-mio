@@ -2,7 +2,7 @@
 
 ## Publicar en GitHub Pages
 
-El workflow de GitHub Actions publica la página al hacer push a `main`. La dirección del proyecto será `https://gxbo-cell.github.io/proyecto-mio/`.
+En el repositorio, abre **Settings → Pages** y selecciona **GitHub Actions** como fuente de despliegue. Después, el workflow publica la página al hacer push a `main`. La dirección del proyecto será `https://gxbo-cell.github.io/proyecto-mio/`.
 
 ## Activar Google Maps y sus comercios
 
