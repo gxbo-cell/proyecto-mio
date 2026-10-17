@@ -220,7 +220,12 @@
 						<div><label class="field-label" for="registration-national-id">Cédula de identidad</label><input id="registration-national-id" type="text" maxlength="24" autocomplete="off" placeholder="V-12345678" required></div>
 						<div><label class="field-label" for="registration-birth-date">Fecha de nacimiento</label><input id="registration-birth-date" type="date" autocomplete="bday" required></div>
 						<div><label class="field-label" for="registration-phone">Teléfono móvil</label><input id="registration-phone" type="tel" maxlength="30" autocomplete="tel" required></div>
-						<div class="driver-registration-full"><label class="field-label" for="registration-email">Correo electrónico</label><input id="registration-email" type="email" maxlength="254" autocomplete="email" required></div>
+						<div id="registration-account-fields" class="driver-registration-full">
+							<label class="field-label" for="registration-email">Correo electrónico</label>
+							<input id="registration-email" type="email" maxlength="254" autocomplete="email" required>
+							<label class="field-label" for="registration-password">Contraseña (mínimo 12 caracteres)</label>
+							<input id="registration-password" type="password" minlength="12" autocomplete="new-password" required>
+						</div>
 					</div>
 				</fieldset>
 				<fieldset class="driver-registration-section">
