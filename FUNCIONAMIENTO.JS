@@ -104,6 +104,7 @@ let deliveryFee = 0;
 let activeCategory = "Todos";
 let editingProductId = null;
 let isSuggestingProductCategory = false;
+let lastSuggestedProductCategory = null;
 
 const productCategoryKeywords = [
 	["Charcutería", ["mortadela", "salchicha", "chorizo", "salami", "tocineta", "tocino", "pepperoni", "jamon"]],
@@ -120,9 +121,9 @@ function normalizeProductText(value) {
 }
 
 function suggestProductCategory(name) {
-	const normalizedName = normalizeProductText(name).replace(/[^\p{L}\p{N}]+/gu, " ");
+	const normalizedName = normalizeProductText(name).replace(/[^a-z0-9]+/g, " ");
 	return productCategoryKeywords.find(({ keyword }) =>
-		(` ${normalizedName} `).includes(` ${keyword} `)
+		(` ${normalizedName} `).includes(` ${normalizeProductText(keyword)} `)
 	)?.category || null;
 }
 
@@ -132,12 +133,20 @@ function updateProductCategorySuggestion() {
 	}
 	const suggestedCategory = suggestProductCategory(productNameInput.value);
 	if (!suggestedCategory) {
+		if (lastSuggestedProductCategory && productCategoryInput.value === lastSuggestedProductCategory) {
+			isSuggestingProductCategory = true;
+			productCategoryInput.value = "Víveres";
+			productCategoryInput.dispatchEvent(new Event("change"));
+			isSuggestingProductCategory = false;
+		}
+		lastSuggestedProductCategory = null;
 		productCategoryHint.textContent = productNameInput.value.trim()
 			? "No reconocí la categoría; puedes elegirla manualmente."
 			: "";
 		return;
 	}
 	if (productCategoryInput.value === suggestedCategory) {
+		lastSuggestedProductCategory = suggestedCategory;
 		productCategoryHint.textContent = `Categoría sugerida: ${suggestedCategory}. Puedes cambiarla si hace falta.`;
 		return;
 	}
@@ -145,6 +154,7 @@ function updateProductCategorySuggestion() {
 	productCategoryInput.value = suggestedCategory;
 	productCategoryInput.dispatchEvent(new Event("change"));
 	isSuggestingProductCategory = false;
+	lastSuggestedProductCategory = suggestedCategory;
 	productCategoryHint.textContent = `Categoría sugerida: ${suggestedCategory}. Puedes cambiarla si hace falta.`;
 }
 
@@ -778,6 +788,7 @@ function updateOrderStatus(orderId, nextStatus) {
 
 function beginProductEdit(product) {
 	editingProductId = product.id;
+	lastSuggestedProductCategory = null;
 	productNameInput.value = product.name;
 	productCategoryInput.value = product.category;
 	productCategoryHint.textContent = "La categoría no cambiará automáticamente mientras editas.";
@@ -794,6 +805,7 @@ function beginProductEdit(product) {
 
 function cancelProductEdit() {
 	editingProductId = null;
+	lastSuggestedProductCategory = null;
 	productForm.reset();
 	productCategoryHint.textContent = "";
 	configureProductFormMode();
@@ -1525,6 +1537,7 @@ productForm.addEventListener("submit", (event) => {
 			stock
 		});
 	}
+	lastSuggestedProductCategory = null;
 	saveProducts();
 	productForm.reset();
 	productCategoryHint.textContent = "";
@@ -1557,6 +1570,7 @@ productNameInput.addEventListener("input", updateProductCategorySuggestion);
 productCategoryInput.addEventListener("change", () => {
 	const nextMode = ["Carnes", "Charcutería"].includes(productCategoryInput.value) ? "weight" : "unit";
 	if (!isSuggestingProductCategory) {
+		lastSuggestedProductCategory = null;
 		productCategoryHint.textContent = "Categoría seleccionada manualmente.";
 	}
 	if (nextMode !== productSaleModeInput.value) {
