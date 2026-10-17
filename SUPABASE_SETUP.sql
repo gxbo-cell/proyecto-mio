@@ -1,8 +1,6 @@
 -- Run this script in the Supabase SQL Editor for the La Tiendita project.
--- To authorize a driver, create their Auth user in Authentication, then add
--- that user's id and verified vehicle details to public.drivers:
--- insert into public.drivers (user_id, full_name, phone, plate_number, vehicle_make, vehicle_model, vehicle_year)
--- values ('AUTH_USER_UUID', 'Nombre del conductor', '0412-000-0000', 'ABC123', 'Toyota', 'Corolla', 2022);
+-- Driver documents are stored in the private driver-documents bucket. Only the
+-- project owner can review them in the Supabase dashboard.
 
 create extension if not exists pgcrypto with schema extensions;
 
@@ -14,9 +12,88 @@ create table if not exists public.drivers (
 	vehicle_make text not null check (length(trim(vehicle_make)) between 1 and 50),
 	vehicle_model text not null check (length(trim(vehicle_model)) between 1 and 50),
 	vehicle_year integer not null check (vehicle_year between 1980 and 2100),
+	national_id text,
+	birth_date date,
+	license_number text,
+	license_class text,
+	license_expires_on date,
+	emergency_contact_name text,
+	emergency_contact_phone text,
+	vehicle_color text,
+	vehicle_registration_number text,
+	insurance_company text,
+	insurance_policy_number text,
+	insurance_expires_on date,
 	active boolean not null default true,
 	created_at timestamptz not null default now()
 );
+
+alter table public.drivers add column if not exists national_id text;
+alter table public.drivers add column if not exists birth_date date;
+alter table public.drivers add column if not exists license_number text;
+alter table public.drivers add column if not exists license_class text;
+alter table public.drivers add column if not exists license_expires_on date;
+alter table public.drivers add column if not exists emergency_contact_name text;
+alter table public.drivers add column if not exists emergency_contact_phone text;
+alter table public.drivers add column if not exists vehicle_color text;
+alter table public.drivers add column if not exists vehicle_registration_number text;
+alter table public.drivers add column if not exists insurance_company text;
+alter table public.drivers add column if not exists insurance_policy_number text;
+alter table public.drivers add column if not exists insurance_expires_on date;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+	'driver-documents',
+	'driver-documents',
+	false,
+	8388608,
+	array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+on conflict (id) do update
+set public = false,
+	file_size_limit = excluded.file_size_limit,
+	allowed_mime_types = excluded.allowed_mime_types;
+
+create table if not exists public.driver_documents (
+	user_id uuid not null references public.drivers(user_id) on delete cascade,
+	document_type text not null check (document_type in ('identity', 'license', 'vehicle_registration', 'insurance')),
+	object_path text not null unique,
+	uploaded_at timestamptz not null default now(),
+	primary key (user_id, document_type)
+);
+
+alter table public.driver_documents enable row level security;
+revoke all on public.driver_documents from anon, authenticated;
+
+drop policy if exists "Drivers upload their own private documents" on storage.objects;
+create policy "Drivers upload their own private documents"
+	on storage.objects for insert to authenticated
+	with check (
+		bucket_id = 'driver-documents'
+		and (storage.foldername(name))[1] = auth.uid()::text
+		and (storage.foldername(name))[2] in ('identity', 'license', 'vehicle_registration', 'insurance')
+	);
+
+drop policy if exists "Drivers replace their own private documents" on storage.objects;
+create policy "Drivers replace their own private documents"
+	on storage.objects for update to authenticated
+	using (
+		bucket_id = 'driver-documents'
+		and (storage.foldername(name))[1] = auth.uid()::text
+	)
+	with check (
+		bucket_id = 'driver-documents'
+		and (storage.foldername(name))[1] = auth.uid()::text
+		and (storage.foldername(name))[2] in ('identity', 'license', 'vehicle_registration', 'insurance')
+	);
+
+drop policy if exists "Drivers delete their own private documents" on storage.objects;
+create policy "Drivers delete their own private documents"
+	on storage.objects for delete to authenticated
+	using (
+		bucket_id = 'driver-documents'
+		and (storage.foldername(name))[1] = auth.uid()::text
+	);
 
 create table if not exists public.delivery_orders (
 	id uuid primary key default gen_random_uuid(),
@@ -58,10 +135,153 @@ as $$
 		'plate_number', plate_number,
 		'vehicle_make', vehicle_make,
 		'vehicle_model', vehicle_model,
-		'vehicle_year', vehicle_year
+		'vehicle_year', vehicle_year,
+		'vehicle_color', vehicle_color
 	)
 	from public.drivers
 	where user_id = auth.uid() and active;
+$$;
+
+create or replace function public.register_my_driver_profile(
+	p_full_name text,
+	p_phone text,
+	p_national_id text,
+	p_birth_date date,
+	p_license_number text,
+	p_license_class text,
+	p_license_expires_on date,
+	p_emergency_contact_name text,
+	p_emergency_contact_phone text,
+	p_plate_number text,
+	p_vehicle_make text,
+	p_vehicle_model text,
+	p_vehicle_year integer,
+	p_vehicle_color text,
+	p_vehicle_registration_number text,
+	p_insurance_company text,
+	p_insurance_policy_number text,
+	p_insurance_expires_on date
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+begin
+	if auth.uid() is null then
+		raise exception 'Inicia sesión para registrar tu perfil de conductor.';
+	end if;
+
+	if length(trim(coalesce(p_full_name, ''))) not between 2 and 100
+		or length(trim(coalesce(p_phone, ''))) not between 7 and 30
+		or length(trim(coalesce(p_national_id, ''))) not between 5 and 24
+		or p_birth_date is null
+		or p_birth_date > current_date - interval '18 years'
+		or p_birth_date < current_date - interval '100 years'
+		or length(trim(coalesce(p_license_number, ''))) not between 3 and 40
+		or length(trim(coalesce(p_license_class, ''))) not between 1 and 40
+		or p_license_expires_on is null or p_license_expires_on < current_date
+		or length(trim(coalesce(p_emergency_contact_name, ''))) not between 2 and 100
+		or length(trim(coalesce(p_emergency_contact_phone, ''))) not between 7 and 30
+		or length(trim(coalesce(p_plate_number, ''))) not between 2 and 20
+		or length(trim(coalesce(p_vehicle_make, ''))) not between 1 and 50
+		or length(trim(coalesce(p_vehicle_model, ''))) not between 1 and 50
+		or p_vehicle_year is null or p_vehicle_year not between 1980 and extract(year from current_date)::integer + 1
+		or length(trim(coalesce(p_vehicle_color, ''))) not between 2 and 40
+		or length(trim(coalesce(p_vehicle_registration_number, ''))) not between 3 and 60
+		or length(trim(coalesce(p_insurance_company, ''))) not between 2 and 100
+		or length(trim(coalesce(p_insurance_policy_number, ''))) not between 3 and 60
+		or p_insurance_expires_on is null or p_insurance_expires_on < current_date then
+		raise exception 'Revisa los datos del registro y confirma que la licencia y el seguro estén vigentes.';
+	end if;
+
+	insert into public.drivers (
+		user_id, full_name, phone, plate_number, vehicle_make, vehicle_model, vehicle_year,
+		national_id, birth_date, license_number, license_class, license_expires_on,
+		emergency_contact_name, emergency_contact_phone, vehicle_color,
+		vehicle_registration_number, insurance_company, insurance_policy_number,
+		insurance_expires_on, active
+	) values (
+		auth.uid(), trim(p_full_name), trim(p_phone), upper(trim(p_plate_number)),
+		trim(p_vehicle_make), trim(p_vehicle_model), p_vehicle_year,
+		upper(trim(p_national_id)), p_birth_date, trim(p_license_number), trim(p_license_class), p_license_expires_on,
+		trim(p_emergency_contact_name), trim(p_emergency_contact_phone), trim(p_vehicle_color),
+		trim(p_vehicle_registration_number), trim(p_insurance_company), trim(p_insurance_policy_number),
+		p_insurance_expires_on, false
+	)
+	on conflict (user_id) do update set
+		full_name = excluded.full_name,
+		phone = excluded.phone,
+		plate_number = excluded.plate_number,
+		vehicle_make = excluded.vehicle_make,
+		vehicle_model = excluded.vehicle_model,
+		vehicle_year = excluded.vehicle_year,
+		national_id = excluded.national_id,
+		birth_date = excluded.birth_date,
+		license_number = excluded.license_number,
+		license_class = excluded.license_class,
+		license_expires_on = excluded.license_expires_on,
+		emergency_contact_name = excluded.emergency_contact_name,
+		emergency_contact_phone = excluded.emergency_contact_phone,
+		vehicle_color = excluded.vehicle_color,
+		vehicle_registration_number = excluded.vehicle_registration_number,
+		insurance_company = excluded.insurance_company,
+		insurance_policy_number = excluded.insurance_policy_number,
+		insurance_expires_on = excluded.insurance_expires_on,
+		active = false;
+
+	return true;
+end;
+$$;
+
+create or replace function public.record_my_driver_document(p_document_type text, p_object_path text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth, storage, pg_temp
+as $$
+begin
+	if auth.uid() is null
+		or p_document_type not in ('identity', 'license', 'vehicle_registration', 'insurance')
+		or p_object_path is null
+		or split_part(p_object_path, '/', 1) <> auth.uid()::text
+		or split_part(p_object_path, '/', 2) <> p_document_type
+		or not exists (
+			select 1 from storage.objects
+			where bucket_id = 'driver-documents' and name = p_object_path
+		) then
+		raise exception 'No se pudo verificar el archivo privado del documento.';
+	end if;
+
+	insert into public.driver_documents (user_id, document_type, object_path)
+	values (auth.uid(), p_document_type, p_object_path)
+	on conflict (user_id, document_type) do update
+	set object_path = excluded.object_path, uploaded_at = now();
+
+	return true;
+end;
+$$;
+
+create or replace function public.activate_my_driver_profile()
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth, pg_temp
+as $$
+begin
+	if auth.uid() is null
+		or not exists (select 1 from public.drivers where user_id = auth.uid())
+		or (
+			select count(*) from public.driver_documents
+			where user_id = auth.uid()
+				and document_type in ('identity', 'license', 'vehicle_registration', 'insurance')
+		) <> 4 then
+		raise exception 'Completa los datos y carga los cuatro documentos solicitados para activar tu perfil.';
+	end if;
+
+	update public.drivers set active = true where user_id = auth.uid();
+	return true;
+end;
 $$;
 
 alter table public.drivers enable row level security;
