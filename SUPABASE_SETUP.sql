@@ -1,6 +1,8 @@
 -- Run this script in the Supabase SQL Editor for the La Tiendita project.
 -- Driver documents are stored in the private driver-documents bucket. Only the
 -- project owner can review them in the Supabase dashboard.
+-- Before production, configure Auth with email confirmation, a 12-character
+-- minimum password, CAPTCHA, and appropriate sign-up rate limits.
 
 create extension if not exists pgcrypto with schema extensions;
 
