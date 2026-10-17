@@ -1318,75 +1318,7 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 		document.querySelectorAll(".app-view").forEach((view) => {
 			view.hidden = view.id !== button.dataset.viewTarget;
 		});
-		if (button.dataset.viewTarget === "driver-view") {
-			renderDriverSession();
-		} else if (button.dataset.viewTarget === "shopping-view" && latestDelivery) {
-			void renderLatestDeliveryTracking();
-		} else if (button.dataset.viewTarget === "admin-view") {
-			renderSupabaseConfiguration();
-		}
 	});
-});
-supabaseSetupForm.addEventListener("submit", configureSupabase);
-supabaseSetupClearButton.addEventListener("click", disconnectSupabase);
-driverLoginForm.addEventListener("submit", async (event) => {
-	event.preventDefault();
-	driverLoginFeedback.textContent = "Verificando la cuenta de conductor...";
-	const loginButton = driverLoginForm.querySelector('button[type="submit"]');
-	loginButton.disabled = true;
-	try {
-		await signInDriver(
-			document.querySelector("#driver-email").value.trim(),
-			document.querySelector("#driver-password").value
-		);
-		driverLoginFeedback.textContent = "Sesión iniciada.";
-		renderDriverSession();
-	} catch (error) {
-		driverLoginFeedback.textContent = `No se pudo iniciar sesión: ${error.message}`;
-	} finally {
-		loginButton.disabled = false;
-	}
-});
-openDriverRegistrationButton.addEventListener("click", () => {
-	configureDriverRegistrationForm();
-	driverRegistrationFeedback.textContent = "";
-	driverRegistrationDialog.showModal();
-});
-continueDriverRegistrationButton.addEventListener("click", () => {
-	configureDriverRegistrationForm();
-	driverRegistrationFeedback.textContent = "";
-	driverRegistrationDialog.showModal();
-});
-driverRegistrationForm.addEventListener("submit", registerDriver);
-document.querySelector("#close-driver-registration").addEventListener("click", () => driverRegistrationDialog.close());
-document.querySelector("#cancel-driver-registration").addEventListener("click", () => driverRegistrationDialog.close());
-document.querySelector("#driver-logout").addEventListener("click", () => {
-	driverSession = null;
-	window.clearInterval(driverOrdersTimer);
-	driverOrdersTimer = null;
-	localStorage.removeItem(DRIVER_SESSION_KEY);
-	availableOrders.replaceChildren();
-	myDriverOrders.replaceChildren();
-	driverLoginFeedback.textContent = "Sesión cerrada.";
-	document.querySelector("#driver-registration-status").textContent = "";
-	renderDriverSession();
-});
-document.querySelector("#refresh-driver-orders").addEventListener("click", refreshDriverOrders);
-document.querySelector("#tracking-lookup-form").addEventListener("submit", (event) => {
-	event.preventDefault();
-	const trackingCode = document.querySelector("#tracking-lookup-code").value.trim();
-	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trackingCode)) {
-		document.querySelector("#tracking-lookup-feedback").textContent = "El código debe tener el formato completo que recibiste al confirmar el pedido.";
-		return;
-	}
-	latestDelivery = { trackingCode };
-	try {
-		localStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(latestDelivery));
-	} catch {
-		document.querySelector("#tracking-lookup-feedback").textContent = "No se pudo guardar este código, pero intentaremos consultar el pedido.";
-	}
-	document.querySelector("#tracking-lookup-feedback").textContent = "";
-	void renderLatestDeliveryTracking();
 });
 deliveryToggle.addEventListener("change", () => {
 	deliveryFields.hidden = !deliveryToggle.checked;
@@ -1476,11 +1408,6 @@ document.querySelector("#confirm-payment").addEventListener("click", () => {
 		completePurchase(paymentMethod);
 	}
 });
-driverLoginForm.addEventListener("input", () => {
-	if (!isSupabaseConfigured()) {
-		document.querySelector("#driver-setup-notice").hidden = false;
-	}
-});
 paymentDetailsDialog.addEventListener("click", (event) => {
 	if (event.target === paymentDetailsDialog) {
 		paymentDetailsDialog.close();
@@ -1496,18 +1423,7 @@ document.querySelector("#admin-date").textContent = new Intl.DateTimeFormat("es"
 	month: "long",
 	year: "numeric"
 }).format(new Date()).toLocaleUpperCase("es");
-document.querySelector("#driver-date").textContent = new Intl.DateTimeFormat("es", {
-	day: "numeric",
-	month: "long",
-	year: "numeric"
-}).format(new Date()).toLocaleUpperCase("es");
-if (latestDelivery) {
-	void renderLatestDeliveryTracking();
-}
-
 renderProducts();
 renderCart();
 configureProductFormMode();
-renderSupabaseConfiguration();
-renderDriverSession();
 loadDailyRate();
