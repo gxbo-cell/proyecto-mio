@@ -1585,7 +1585,7 @@ async function uploadDriverDocument(documentType, file) {
 	if (!extension || file.size === 0 || file.size > 8 * 1024 * 1024) {
 		throw new Error("Cada documento debe ser JPG, PNG, WebP o PDF y no superar 8 MB.");
 	}
-	const objectPath = `${driverSession.user.id}/${documentType}/${crypto.randomUUID()}.${extension}`;
+	const objectPath = `${driverSession.user.id}/${documentType}/document`;
 	const encodedPath = objectPath.split("/").map(encodeURIComponent).join("/");
 	const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/driver-documents/${encodedPath}`, {
 		method: "POST",
