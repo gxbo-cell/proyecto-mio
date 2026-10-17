@@ -4,6 +4,7 @@ const STORAGE_KEY = "la-tiendita-inventory-v1";
 const ORDER_STORAGE_KEY = "la-tiendita-orders-v1";
 const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v1";
 const RATE_ENDPOINT = "https://ve.dolarapi.com/v1/dolares/oficial";
+const RATE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const DELIVERY_ORIGIN = { latitude: 10.4806, longitude: -66.9036 };
 const DELIVERY_ZONE_KM = 5;
 const DELIVERY_ZONE_PRICE = 1;
@@ -95,6 +96,8 @@ let products = loadProducts();
 let orders = loadOrders();
 let cart = [];
 let exchangeRate = loadCachedRate();
+let isLoadingExchangeRate = false;
+let hasAttemptedExchangeRateLoad = false;
 let deliveryCoordinates = null;
 let mapPickerCoordinates = null;
 let mapPickerSearchTimer;
@@ -207,8 +210,12 @@ function loadCachedRate() {
 }
 
 async function loadDailyRate() {
+	if (isLoadingExchangeRate || document.visibilityState === "hidden") {
+		return;
+	}
+	isLoadingExchangeRate = true;
 	const updatedLabel = document.querySelector("#rate-updated");
-	if (exchangeRate) {
+	if (exchangeRate && !hasAttemptedExchangeRateLoad) {
 		renderExchangeRate("Tasa guardada · ");
 	}
 
@@ -223,10 +230,12 @@ async function loadDailyRate() {
 		}
 		exchangeRate = { value: data.promedio, date: data.fechaActualizacion };
 		localStorage.setItem(RATE_STORAGE_KEY, JSON.stringify(exchangeRate));
+		hasAttemptedExchangeRateLoad = true;
 		renderExchangeRate();
 		renderProducts();
 		renderCart();
 	} catch {
+		hasAttemptedExchangeRateLoad = true;
 		if (exchangeRate) {
 			renderExchangeRate("Sin conexión · última tasa guardada · ");
 		} else {
@@ -235,6 +244,8 @@ async function loadDailyRate() {
 			renderProducts();
 			renderCart();
 		}
+	} finally {
+		isLoadingExchangeRate = false;
 	}
 }
 
@@ -1757,4 +1768,14 @@ renderProducts();
 renderCart();
 renderSales();
 configureProductFormMode();
+window.setInterval(() => {
+	if (document.visibilityState === "visible") {
+		loadDailyRate();
+	}
+}, RATE_REFRESH_INTERVAL_MS);
+document.addEventListener("visibilitychange", () => {
+	if (document.visibilityState === "visible") {
+		loadDailyRate();
+	}
+});
 loadDailyRate();
