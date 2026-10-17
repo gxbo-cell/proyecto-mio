@@ -13,4 +13,4 @@ Sin una clave configurada, el selector conserva el mapa alternativo y sus datos 
 3. En GitHub, abre **Settings → Secrets and variables → Actions** y crea el secreto de repositorio `GOOGLE_MAPS_API_KEY` con esa clave.
 4. Haz push a `main` o ejecuta **Deploy La Tiendita to GitHub Pages** desde la pestaña **Actions**. Al terminar, abre la URL de Pages.
 
-La clave de navegador estará visible para quien visite el sitio, como es normal para Maps JavaScript API; las restricciones de referente y de API son necesarias para limitar su uso. La página abierta directamente como `file://` no puede usar la integración de Google, por lo que muestra el mapa alternativo.
+La clave de navegador estará visible para quien visite el sitio, como es normal para Maps JavaScript API; las restricciones de referente y de API son necesarias para limitar su uso. Revisa los presupuestos y cuotas del proyecto de Google Cloud, ya que Maps y Places pueden generar cargos según el uso. La página abierta directamente como `file://` no puede usar la integración de Google, por lo que muestra el mapa alternativo.
