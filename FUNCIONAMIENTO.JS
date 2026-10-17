@@ -1172,6 +1172,12 @@ function openMapPicker() {
 	window.setTimeout(() => {
 		if (mapPickerMap) {
 			mapPickerMap.invalidateSize({ pan: false });
+			const mapCenter = mapPickerCoordinates || DELIVERY_ORIGIN;
+			mapPickerMap.setView(
+				[mapCenter.latitude, mapCenter.longitude],
+				mapPickerCoordinates ? 16 : 12,
+				{ animate: false }
+			);
 			loadNearbyPlaces();
 		}
 	}, 100);
