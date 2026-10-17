@@ -1574,9 +1574,9 @@ async function selectMapSuggestion(index) {
 	if (!place) {
 		return;
 	}
+	const prediction = place.googlePlace ? googlePlacePredictions[index] : null;
 	hideMapSuggestions();
 	if (place.googlePlace) {
-		const prediction = googlePlacePredictions[index];
 		if (prediction) {
 			try {
 				const googlePlace = prediction.toPlace();
