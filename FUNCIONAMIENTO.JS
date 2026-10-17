@@ -995,7 +995,7 @@ async function searchMapLocation() {
 	}
 	mapPickerFeedback.textContent = "Buscando lugar...";
 	try {
-		const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=es&q=${encodeURIComponent(query)}`, {
+		const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=es&countrycodes=ve&viewbox=-73,13,-59,-1&bounded=1&q=${encodeURIComponent(query)}`, {
 			headers: { Accept: "application/json" }
 		});
 		if (!response.ok) {
