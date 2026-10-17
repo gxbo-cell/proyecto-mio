@@ -1275,14 +1275,14 @@ productForm.addEventListener("submit", (event) => {
 
 document.querySelector("#cancel-edit-button").addEventListener("click", cancelProductEdit);
 productCategoryInput.addEventListener("change", () => {
-	if (editingProductId) {
-		return;
-	}
 	const nextMode = ["Carnes", "Charcutería"].includes(productCategoryInput.value) ? "weight" : "unit";
 	if (nextMode !== productSaleModeInput.value) {
 		productStockInput.value = "";
 		productSaleModeInput.value = nextMode;
 		configureProductFormMode();
+		if (editingProductId) {
+			showFeedback(`La categoría requiere venta ${nextMode === "weight" ? "por peso" : "por unidad"}. Ingresa las existencias actuales en ${nextMode === "weight" ? "kg" : "unidades"}.`);
+		}
 	}
 });
 productSaleModeInput.addEventListener("change", () => {
