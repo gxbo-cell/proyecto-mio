@@ -233,84 +233,177 @@ function updateDeliveryEstimate() {
 function renderProducts() {
 	const searchTerm = searchInput.value.trim().toLocaleLowerCase("es");
 	const visibleProducts = products.filter((product) =>
-		product.name.toLocaleLowerCase("es").includes(searchTerm)
+		product.name.toLocaleLowerCase("es").includes(searchTerm) &&
+		(activeCategory === "Todos" || product.category === activeCategory)
 	);
+	catalogProducts.replaceChildren();
 	productList.replaceChildren();
 
 	for (const product of visibleProducts) {
 		const discountedPrice = getDiscountedPrice(product.price);
-		const row = document.createElement("tr");
-		const productCell = document.createElement("td");
-		productCell.textContent = product.name;
-
-		const priceCell = document.createElement("td");
-		priceCell.className = "price-cell";
+		const card = document.createElement("article");
+		card.className = `product-card${product.stock === 0 ? " product-card-soldout" : ""}`;
+		const visual = document.createElement("div");
+		visual.className = `product-card-visual category-${product.category.toLocaleLowerCase("es").replace("á", "a").replace("é", "e")}`;
+		visual.setAttribute("aria-hidden", "true");
+		visual.textContent = ({ Carnes: "🥩", Víveres: "🛒", Bebidas: "🥤", "Lácteos": "🥛", Otros: "🌿" })[product.category];
+		const details = document.createElement("div");
+		details.className = "product-card-details";
+		const category = document.createElement("span");
+		category.className = "product-category-label";
+		category.textContent = product.category;
+		const status = document.createElement("span");
+		status.className = `product-status${product.stock === 0 ? " sold-out" : product.stock <= 3 ? " low-stock" : ""}`;
+		status.textContent = product.stock === 0 ? "Agotado" : product.stock <= 3 ? "Pocas unidades" : "Disponible";
+		const name = document.createElement("h3");
+		name.className = "product-card-name";
+		name.textContent = product.name;
+		const price = document.createElement("div");
+		price.className = "product-card-price";
 		if (discountedPrice < product.price) {
 			const originalPrice = document.createElement("span");
 			originalPrice.className = "old-price";
 			originalPrice.textContent = formatMoney(product.price);
-			priceCell.append(originalPrice);
+			price.append(originalPrice);
 		}
-		priceCell.append(document.createTextNode(formatMoney(discountedPrice)));
-		const bolivarPrice = document.createElement("span");
-		bolivarPrice.className = "rate-price";
-		bolivarPrice.textContent = formatBolivars(discountedPrice);
-		priceCell.append(bolivarPrice);
+		const currentPrice = document.createElement("strong");
+		currentPrice.textContent = formatMoney(discountedPrice);
+		price.append(currentPrice);
 		if (discountedPrice < product.price) {
 			const discountTag = document.createElement("span");
 			discountTag.className = "discount-tag";
 			discountTag.textContent = "-10%";
-			priceCell.append(discountTag);
+			price.append(discountTag);
 		}
+		const bolivarPrice = document.createElement("span");
+		bolivarPrice.className = "rate-price";
+		bolivarPrice.textContent = formatBolivars(discountedPrice);
+		price.append(bolivarPrice);
+		details.append(category, status, name, price);
 
-		const stockCell = document.createElement("td");
-		const stockPill = document.createElement("span");
-		stockPill.className = `stock-pill${product.stock > 0 && product.stock <= 3 ? " low" : ""}`;
-		stockPill.textContent = product.stock === 0 ? "Agotado" : String(product.stock);
-		stockCell.append(stockPill);
-
-		const purchaseCell = document.createElement("td");
 		const controls = document.createElement("div");
-		controls.className = "buy-controls";
+		controls.className = "product-card-controls";
 		const quantityInput = document.createElement("input");
 		quantityInput.className = "buy-quantity";
 		quantityInput.type = "number";
 		quantityInput.min = "1";
 		const availableStock = product.stock - getCartQuantity(product.id);
-		if (product.stock === 0) {
-			quantityInput.removeAttribute("max");
-		} else {
-			quantityInput.max = String(availableStock);
-		}
+		quantityInput.max = String(Math.max(1, availableStock));
 		quantityInput.value = "1";
 		quantityInput.setAttribute("aria-label", `Cantidad de ${product.name} para añadir al carrito`);
 		const buyButton = document.createElement("button");
-		buyButton.className = `buy-button${product.stock === 0 ? " restock-button" : ""}`;
+		buyButton.className = "buy-button";
 		buyButton.type = "button";
-		buyButton.textContent = product.stock === 0 ? "Reponer" : "Añadir";
-		buyButton.disabled = product.stock > 0 && availableStock === 0;
+		buyButton.textContent = product.stock === 0 ? "Agotado" : "Añadir al carrito";
+		buyButton.disabled = product.stock === 0 || availableStock === 0;
 		buyButton.addEventListener("click", () => {
-			if (product.stock === 0) {
-				restockProduct(product.id, quantityInput.value);
-			} else {
-				addToCart(product.id, quantityInput.value);
-			}
+			addToCart(product.id, quantityInput.value);
 		});
 		controls.append(quantityInput, buyButton);
-		purchaseCell.append(controls);
-		row.append(productCell, priceCell, stockCell, purchaseCell);
-		productList.append(row);
+		card.append(visual, details, controls);
+		catalogProducts.append(card);
 	}
 
 	emptyState.hidden = products.length > 0;
 	noResults.hidden = products.length === 0 || visibleProducts.length > 0;
+	renderAdminProducts();
 	document.querySelector("#product-count").textContent = String(products.length);
 	document.querySelector("#unit-count").textContent = String(
 		products.reduce((total, product) => total + product.stock, 0)
 	);
+	document.querySelector("#out-of-stock-count").textContent = String(
+		products.filter((product) => product.stock === 0).length
+	);
 	document.querySelector("#inventory-value").textContent = formatMoney(
 		products.reduce((total, product) => total + getDiscountedPrice(product.price) * product.stock, 0)
 	);
+}
+
+function renderAdminProducts() {
+	const searchTerm = inventorySearchInput.value.trim().toLocaleLowerCase("es");
+	const filter = stockFilter.value;
+	const visibleProducts = products.filter((product) => {
+		const matchesName = product.name.toLocaleLowerCase("es").includes(searchTerm);
+		const matchesStock = filter === "all" ||
+			(filter === "available" && product.stock > 0) ||
+			(filter === "out" && product.stock === 0) ||
+			(filter === "low" && product.stock > 0 && product.stock <= 3);
+		return matchesName && matchesStock;
+	});
+	productList.replaceChildren();
+
+	for (const product of visibleProducts) {
+		const row = document.createElement("tr");
+		const nameCell = document.createElement("td");
+		nameCell.textContent = product.name;
+		const categoryCell = document.createElement("td");
+		categoryCell.textContent = product.category;
+		const priceCell = document.createElement("td");
+		priceCell.className = "price-cell";
+		priceCell.textContent = formatMoney(product.price);
+		const stockCell = document.createElement("td");
+		const stockInput = document.createElement("input");
+		stockInput.className = "stock-edit-input";
+		stockInput.type = "number";
+		stockInput.min = "0";
+		stockInput.step = "1";
+		stockInput.value = String(product.stock);
+		stockInput.setAttribute("aria-label", `Existencias de ${product.name}`);
+		stockCell.append(stockInput);
+		const actionCell = document.createElement("td");
+		const actionWrap = document.createElement("div");
+		actionWrap.className = "inventory-actions";
+		const status = document.createElement("span");
+		status.className = `stock-pill${product.stock === 0 ? " low" : product.stock <= 3 ? " low" : ""}`;
+		status.textContent = product.stock === 0 ? "Agotado" : product.stock <= 3 ? "Stock bajo" : "En stock";
+		const updateButton = document.createElement("button");
+		updateButton.className = "inventory-action-button";
+		updateButton.type = "button";
+		updateButton.textContent = "Guardar";
+		updateButton.addEventListener("click", () => updateProductStock(product.id, stockInput.value));
+		const deleteButton = document.createElement("button");
+		deleteButton.className = "inventory-delete-button";
+		deleteButton.type = "button";
+		deleteButton.textContent = "Eliminar";
+		deleteButton.addEventListener("click", () => deleteProduct(product.id));
+		actionWrap.append(status, updateButton, deleteButton);
+		actionCell.append(actionWrap);
+		row.append(nameCell, categoryCell, priceCell, stockCell, actionCell);
+		productList.append(row);
+	}
+	document.querySelector("#admin-empty-state").hidden = visibleProducts.length > 0;
+}
+
+function updateProductStock(productId, requestedStock) {
+	const product = products.find((item) => item.id === productId);
+	const stock = Number(requestedStock);
+	if (!product || !Number.isInteger(stock) || stock < 0) {
+		showFeedback("La existencia debe ser un número entero igual o mayor que cero.", true);
+		return;
+	}
+	product.stock = stock;
+	if (getCartQuantity(productId) > stock) {
+		cart = cart.filter((item) => item.productId !== productId);
+		showFeedback(`${product.name}: el stock se actualizó y se retiró del carrito porque excedía las existencias.`);
+	} else {
+		showFeedback(`${product.name}: existencias actualizadas a ${stock}.`);
+	}
+	saveProducts();
+	renderProducts();
+	renderCart();
+}
+
+function deleteProduct(productId) {
+	const product = products.find((item) => item.id === productId);
+	if (!product || !window.confirm(`¿Eliminar "${product.name}" del inventario?`)) {
+		return;
+	}
+	products = products.filter((item) => item.id !== productId);
+	cart = cart.filter((item) => item.productId !== productId);
+	saveProducts();
+	showFeedback(`${product.name} fue eliminado del inventario.`);
+	renderProducts();
+	renderCart();
 }
 
 function restockProduct(productId, requestedQuantity) {
