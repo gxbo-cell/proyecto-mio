@@ -361,7 +361,7 @@ function renderAdminProducts() {
 		const actionWrap = document.createElement("div");
 		actionWrap.className = "inventory-actions";
 		const status = document.createElement("span");
-		status.className = `stock-pill${product.stock === 0 ? " low" : product.stock <= 3 ? " low" : ""}`;
+		status.className = `stock-pill${product.stock <= 3 ? " low" : ""}`;
 		status.textContent = product.stock === 0 ? "Agotado" : product.stock <= 3 ? "Stock bajo" : "En stock";
 		const editButton = document.createElement("button");
 		editButton.className = "inventory-action-button";
@@ -443,21 +443,6 @@ function deleteProduct(productId) {
 	cart = cart.filter((item) => item.productId !== productId);
 	saveProducts();
 	showFeedback(`${product.name} fue eliminado del inventario.`);
-	renderProducts();
-	renderCart();
-}
-
-function restockProduct(productId, requestedQuantity) {
-	const product = products.find((item) => item.id === productId);
-	const quantity = Number(requestedQuantity);
-	if (!product || product.stock !== 0 || !Number.isInteger(quantity) || quantity < 1) {
-		showFeedback("Indica una cantidad entera mayor que cero para reponer.", true);
-		return;
-	}
-	product.stock += quantity;
-	stockAlert.hidden = true;
-	showFeedback(`${product.name}: ${quantity} unidades repuestas.`);
-	saveProducts();
 	renderProducts();
 	renderCart();
 }
@@ -1049,6 +1034,7 @@ productForm.addEventListener("submit", (event) => {
 	const editedProduct = editingProductId
 		? products.find((product) => product.id === editingProductId)
 		: null;
+	let cartItemRemoved = false;
 	if (editingProductId && !editedProduct) {
 		showFeedback("No se encontró el producto que intentas editar. Actualiza la página e inténtalo de nuevo.", true);
 		return;
@@ -1060,6 +1046,7 @@ productForm.addEventListener("submit", (event) => {
 		editedProduct.stock = stock;
 		if (getCartQuantity(editedProduct.id) > stock) {
 			cart = cart.filter((item) => item.productId !== editedProduct.id);
+			cartItemRemoved = true;
 		}
 	} else {
 		products.push({
@@ -1075,10 +1062,14 @@ productForm.addEventListener("submit", (event) => {
 	editingProductId = null;
 	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
 	document.querySelector("#cancel-edit-button").hidden = true;
-	showFeedback(editedProduct ? "Cambios guardados en el producto." : "Producto agregado al inventario.");
+	showFeedback(editedProduct
+		? cartItemRemoved
+			? "Cambios guardados. El producto se retiró del carrito porque el stock ya no cubría la cantidad."
+			: "Cambios guardados en el producto."
+		: "Producto agregado al inventario.");
 
 	if (stock === 0) {
-		stockAlert.textContent = `¡Atención! ${name} se registró sin unidades disponibles.`;
+		stockAlert.textContent = `¡Atención! ${name} ${editedProduct ? "quedó" : "se registró"} sin unidades disponibles.`;
 		stockAlert.hidden = false;
 		document.querySelector("#admin-stock-alert").textContent = `“${name}” fue agregado sin existencias.`;
 		document.querySelector("#admin-stock-alert").hidden = false;
