@@ -1230,6 +1230,7 @@ productForm.addEventListener("submit", (event) => {
 		? products.find((product) => product.id === editingProductId)
 		: null;
 	let cartItemRemoved = false;
+	let cartRemovedForSaleModeChange = false;
 	if (editingProductId && !editedProduct) {
 		showFeedback("No se encontró el producto que intentas editar. Actualiza la página e inténtalo de nuevo.", true);
 		return;
@@ -1244,6 +1245,7 @@ productForm.addEventListener("submit", (event) => {
 		if (saleModeChanged || getCartQuantity(editedProduct.id) > stock) {
 			cart = cart.filter((item) => item.productId !== editedProduct.id);
 			cartItemRemoved = true;
+			cartRemovedForSaleModeChange = saleModeChanged;
 		}
 	} else {
 		products.push({
@@ -1263,7 +1265,9 @@ productForm.addEventListener("submit", (event) => {
 	document.querySelector("#cancel-edit-button").hidden = true;
 	showFeedback(editedProduct
 		? cartItemRemoved
-			? "Cambios guardados. El producto se retiró del carrito porque el stock ya no cubría la cantidad."
+			? cartRemovedForSaleModeChange
+				? "Cambios guardados. El producto se retiró del carrito porque cambió su forma de venta."
+				: "Cambios guardados. El producto se retiró del carrito porque el stock ya no cubría la cantidad."
 			: "Cambios guardados en el producto."
 		: "Producto agregado al inventario.");
 
