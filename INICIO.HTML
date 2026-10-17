@@ -127,6 +127,11 @@
 					<p id="tracking-driver" class="tracking-driver"></p>
 					<div id="tracking-driver-details" class="tracking-driver-details" hidden></div>
 					<p id="tracking-code" class="tracking-code"></p>
+					<form id="tracking-lookup-form" class="tracking-lookup-form">
+						<label class="field-label" for="tracking-lookup-code">¿Perdiste el seguimiento? Ingresa tu código privado</label>
+						<div><input id="tracking-lookup-code" type="text" inputmode="text" autocomplete="off" placeholder="Código del pedido" required><button class="secondary-button" type="submit">Buscar</button></div>
+						<p id="tracking-lookup-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+					</form>
 					<div class="tracking-progress" aria-hidden="true"><span id="tracking-progress-fill"></span></div>
 					<ol class="tracking-steps">
 						<li><span class="tracking-step"><span class="tracking-step-marker">1</span><span class="tracking-step-label">Recogió el pedido</span></span></li>

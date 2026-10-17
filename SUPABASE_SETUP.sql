@@ -43,6 +43,25 @@ create index if not exists delivery_orders_driver_created_idx
 	on public.delivery_orders (driver_id, created_at desc)
 	where driver_id is not null;
 
+create or replace function public.get_my_driver_profile()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+	select jsonb_build_object(
+		'full_name', full_name,
+		'phone', phone,
+		'plate_number', plate_number,
+		'vehicle_make', vehicle_make,
+		'vehicle_model', vehicle_model,
+		'vehicle_year', vehicle_year
+	)
+	from public.drivers
+	where user_id = auth.uid() and active;
+$$;
+
 alter table public.drivers enable row level security;
 alter table public.delivery_orders enable row level security;
 
@@ -287,6 +306,7 @@ revoke all on function public.list_my_delivery_orders() from public;
 revoke all on function public.accept_delivery_order(uuid) from public;
 revoke all on function public.update_delivery_order_status(uuid, text) from public;
 revoke all on function public.get_delivery_tracking(uuid) from public;
+revoke all on function public.get_my_driver_profile() from public;
 
 grant execute on function public.create_delivery_order(uuid, text, text, jsonb, numeric, numeric, text, double precision, double precision, text) to anon, authenticated;
 grant execute on function public.list_available_delivery_orders() to authenticated;
@@ -294,3 +314,4 @@ grant execute on function public.list_my_delivery_orders() to authenticated;
 grant execute on function public.accept_delivery_order(uuid) to authenticated;
 grant execute on function public.update_delivery_order_status(uuid, text) to authenticated;
 grant execute on function public.get_delivery_tracking(uuid) to anon, authenticated;
+grant execute on function public.get_my_driver_profile() to authenticated;
