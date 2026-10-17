@@ -82,6 +82,7 @@ const deliveryFeeBsLabel = document.querySelector("#delivery-fee-bs");
 const deliveryZoneDescription = document.querySelector("#delivery-zone-description");
 const mapPickerDialog = document.querySelector("#map-picker-dialog");
 const mapPickerInput = document.querySelector("#map-picker-input");
+const mapPickerSuggestions = document.querySelector("#map-picker-suggestions");
 const mapPickerMapElement = document.querySelector("#map-picker-map");
 const mapPickerFeedback = document.querySelector("#map-picker-feedback");
 const mapPickerCurrentLocationButton = document.querySelector("#map-picker-current-location");
@@ -101,6 +102,9 @@ let hasAttemptedExchangeRateLoad = false;
 let deliveryCoordinates = null;
 let mapPickerCoordinates = null;
 let mapPickerSearchTimer;
+let mapSuggestionRequestId = 0;
+let mapSuggestionItems = [];
+let activeMapSuggestionIndex = -1;
 let mapPickerMap;
 let mapPickerMarker;
 let deliveryFee = 0;
@@ -1204,6 +1208,28 @@ function updateMapPicker() {
 		: getValidatedMapLink() || "https://www.google.com/maps";
 }
 
+function hideMapSuggestions() {
+	mapPickerSuggestions.hidden = true;
+	mapPickerSuggestions.replaceChildren();
+	mapPickerInput.setAttribute("aria-expanded", "false");
+	mapPickerInput.removeAttribute("aria-activedescendant");
+	mapSuggestionItems = [];
+	activeMapSuggestionIndex = -1;
+}
+
+function formatMapSuggestion(properties) {
+	const street = [properties.housenumber, properties.street].filter(Boolean).join(" ");
+	return [...new Set([
+		properties.name,
+		street,
+		properties.district,
+		properties.city,
+		properties.county,
+		properties.state,
+		properties.country
+	].filter(Boolean))].join(", ");
+}
+
 async function searchMapLocation() {
 	if (!window.L || !mapPickerMap) {
 		mapPickerFeedback.textContent = "El mapa todavía no está listo. Cierra y vuelve a abrir el selector cuando tengas conexión.";
@@ -1214,29 +1240,74 @@ async function searchMapLocation() {
 		mapPickerFeedback.textContent = "Escribe una dirección o lugar para buscar.";
 		return;
 	}
-	mapPickerFeedback.textContent = "Buscando lugar...";
+	if (query.length < 3) {
+		hideMapSuggestions();
+		mapPickerFeedback.textContent = "Escribe al menos 3 caracteres para buscar lugares.";
+		return;
+	}
+	const requestId = ++mapSuggestionRequestId;
+	mapPickerFeedback.textContent = "Buscando lugares...";
 	try {
-		const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=es&q=${encodeURIComponent(query)}`, {
+		const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`, {
 			headers: { Accept: "application/json" }
 		});
 		if (!response.ok) {
 			throw new Error("Búsqueda no disponible");
 		}
-		const results = await response.json();
-		if (results.length === 0) {
+		const data = await response.json();
+		if (requestId !== mapSuggestionRequestId || query !== mapPickerInput.value.trim()) {
+			return;
+		}
+		mapSuggestionItems = data.features
+			.map((feature) => ({
+				label: formatMapSuggestion(feature.properties),
+				latitude: Number(feature.geometry.coordinates[1]),
+				longitude: Number(feature.geometry.coordinates[0])
+			}))
+			.filter((place) => place.label && Number.isFinite(place.latitude) && Number.isFinite(place.longitude));
+		if (mapSuggestionItems.length === 0) {
+			hideMapSuggestions();
 			mapPickerFeedback.textContent = "No encontramos ese lugar. Prueba otra dirección o toca el mapa.";
 			return;
 		}
-		const result = results[0];
-		mapPickerInput.value = result.display_name;
-		mapPickerCoordinates = { latitude: Number(result.lat), longitude: Number(result.lon) };
-		mapPickerFeedback.textContent = "Lugar encontrado. Toca el mapa para ajustar el pin y confirma la ubicación.";
-		updateMapPicker();
+		activeMapSuggestionIndex = -1;
+		mapPickerSuggestions.replaceChildren(...mapSuggestionItems.map((place, index) => {
+			const option = document.createElement("li");
+			option.id = `map-picker-suggestion-${index}`;
+			option.setAttribute("role", "option");
+			option.setAttribute("aria-selected", "false");
+			const button = document.createElement("button");
+			button.type = "button";
+			button.textContent = place.label;
+			button.addEventListener("pointerdown", (event) => event.preventDefault());
+			button.addEventListener("click", () => selectMapSuggestion(index));
+			option.append(button);
+			return option;
+		}));
+		mapPickerSuggestions.hidden = false;
+		mapPickerInput.setAttribute("aria-expanded", "true");
+		mapPickerFeedback.textContent = "Elige una dirección de la lista para colocar el pin.";
 	} catch (error) {
+		if (requestId !== mapSuggestionRequestId) {
+			return;
+		}
+		hideMapSuggestions();
 		mapPickerFeedback.textContent = error instanceof TypeError
-			? "La búsqueda del mapa no respondió. Revisa la conexión o marca el punto manualmente en el mapa."
+			? "No se pudieron cargar sugerencias. Revisa la conexión o marca el punto directamente en el mapa."
 			: `No se pudo buscar la dirección: ${error.message}`;
 	}
+}
+
+function selectMapSuggestion(index) {
+	const place = mapSuggestionItems[index];
+	if (!place) {
+		return;
+	}
+	hideMapSuggestions();
+	setMapPickerSelection({ lat: place.latitude, lng: place.longitude });
+	mapPickerInput.value = place.label;
+	mapPickerFeedback.textContent = "Lugar encontrado. Ajusta el pin si hace falta y confirma la ubicación.";
+	updateMapPicker();
 }
 
 async function setMapPickerSelection(point, reverseGeocode = false) {

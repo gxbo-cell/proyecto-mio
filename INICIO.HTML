@@ -309,10 +309,13 @@
 			</div>
 			<p class="map-picker-intro">Busca una dirección, explora el mapa o usa tu ubicación actual. Confirma el punto para agregarlo al pedido.</p>
 			<div class="map-picker-tools">
-				<label class="map-picker-search" for="map-picker-input">
-					<span aria-hidden="true">⌕</span>
-					<input id="map-picker-input" type="search" aria-label="Dirección, zona o lugar" placeholder="Dirección, zona o lugar" autocomplete="off">
-				</label>
+				<div class="map-picker-search-wrap">
+					<label class="map-picker-search" for="map-picker-input">
+						<span aria-hidden="true">⌕</span>
+						<input id="map-picker-input" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="map-picker-suggestions" aria-label="Dirección, zona o lugar" placeholder="Dirección, zona o lugar" autocomplete="off">
+					</label>
+					<ul id="map-picker-suggestions" class="map-picker-suggestions" role="listbox" aria-label="Sugerencias de lugares" hidden></ul>
+				</div>
 				<button id="search-map-location" class="map-search-button" type="button">Buscar</button>
 				<button id="map-picker-current-location" class="location-button" type="button"><span aria-hidden="true">⌖</span> Mi ubicación</button>
 			</div>
