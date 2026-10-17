@@ -57,6 +57,7 @@
 					<button class="category-filter" type="button" data-category="Otros" aria-pressed="false">Otros</button>
 				</div>
 				<div id="stock-alert" class="stock-alert" role="status" aria-live="polite" hidden></div>
+				<p id="catalog-feedback" class="catalog-feedback" role="status" aria-live="polite"></p>
 				<div id="catalog-products" class="catalog-grid"></div>
 				<div id="empty-state" class="empty-state">
 					<span class="empty-icon" aria-hidden="true">＋</span>
@@ -201,7 +202,7 @@
 								<option value="unit">Por unidad</option>
 								<option value="weight">Por peso (kg)</option>
 							</select>
-							<p id="product-stock-guidance" class="stock-guidance">Para carnes y charcutería, el precio se ingresa por kg y las existencias se controlan en gramos.</p>
+							<p id="product-stock-guidance" class="stock-guidance">Elige si venderás este producto por unidad o por peso.</p>
 							<div class="field-row">
 								<div><label id="product-price-label" class="field-label" for="product-price">Precio (USD)</label><div class="input-prefix"><span>$</span><input id="product-price" name="price" type="number" min="0.01" step="0.01" placeholder="0.00" required></div></div>
 								<div><label id="product-stock-label" class="field-label" for="product-stock">Cantidad inicial</label><input id="product-stock" name="stock" type="number" min="0" step="1" placeholder="0" required></div>
