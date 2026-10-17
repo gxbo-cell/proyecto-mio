@@ -1467,9 +1467,17 @@ async function signInDriver(email, password) {
 	if (!result.access_token) {
 		throw new Error("Supabase no devolvió una sesión de conductor.");
 	}
+	const driver = await callSupabaseFunction("get_my_driver_profile", {}, result.access_token);
+	if (!driver) {
+		throw new Error("Esta cuenta no tiene un perfil de conductor activo. Contacta a la tienda.");
+	}
+	result.driver = driver;
 	driverSession = result;
-	localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(driverSession));
-	await callSupabaseFunction("list_available_delivery_orders", {}, driverSession.access_token);
+	try {
+		localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(driverSession));
+	} catch {
+		throw new Error("El inicio de sesión funcionó, pero no se pudo guardar la sesión en este navegador.");
+	}
 }
 
 async function completePurchase(paymentMethod) {
@@ -1674,7 +1682,52 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 		document.querySelectorAll(".app-view").forEach((view) => {
 			view.hidden = view.id !== button.dataset.viewTarget;
 		});
+		if (button.dataset.viewTarget === "driver-view") {
+			renderDriverSession();
+		} else if (button.dataset.viewTarget === "shopping-view" && latestDelivery) {
+			void renderLatestDeliveryTracking();
+		}
 	});
+});
+driverLoginForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	driverLoginFeedback.textContent = "Verificando la cuenta de conductor...";
+	try {
+		await signInDriver(
+			document.querySelector("#driver-email").value.trim(),
+			document.querySelector("#driver-password").value
+		);
+		driverLoginFeedback.textContent = "Sesión iniciada.";
+		renderDriverSession();
+	} catch (error) {
+		driverLoginFeedback.textContent = `No se pudo iniciar sesión: ${error.message}`;
+	}
+});
+document.querySelector("#driver-logout").addEventListener("click", () => {
+	driverSession = null;
+	window.clearInterval(driverOrdersTimer);
+	localStorage.removeItem(DRIVER_SESSION_KEY);
+	availableOrders.replaceChildren();
+	myDriverOrders.replaceChildren();
+	driverLoginFeedback.textContent = "Sesión cerrada.";
+	renderDriverSession();
+});
+document.querySelector("#refresh-driver-orders").addEventListener("click", refreshDriverOrders);
+document.querySelector("#tracking-lookup-form").addEventListener("submit", (event) => {
+	event.preventDefault();
+	const trackingCode = document.querySelector("#tracking-lookup-code").value.trim();
+	if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trackingCode)) {
+		document.querySelector("#tracking-lookup-feedback").textContent = "El código debe tener el formato completo que recibiste al confirmar el pedido.";
+		return;
+	}
+	latestDelivery = { trackingCode };
+	try {
+		localStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(latestDelivery));
+	} catch {
+		document.querySelector("#tracking-lookup-feedback").textContent = "No se pudo guardar este código, pero intentaremos consultar el pedido.";
+	}
+	document.querySelector("#tracking-lookup-feedback").textContent = "";
+	void renderLatestDeliveryTracking();
 });
 deliveryToggle.addEventListener("change", () => {
 	deliveryFields.hidden = !deliveryToggle.checked;
@@ -1732,9 +1785,6 @@ mapPickerCurrentLocationButton.addEventListener("click", useLocationInPicker);
 document.querySelector("#confirm-map-location").addEventListener("click", selectMapPickerLocation);
 document.querySelector("#close-map-picker").addEventListener("click", () => mapPickerDialog.close());
 document.querySelector("#cancel-map-picker").addEventListener("click", () => mapPickerDialog.close());
-document.querySelectorAll(".tracking-step").forEach((button) => {
-	button.addEventListener("click", () => advanceDeliveryStatus(Number(button.dataset.deliveryStep)));
-});
 checkoutButton.addEventListener("click", openCheckout);
 document.querySelector("#close-checkout").addEventListener("click", () => checkoutDialog.close());
 document.querySelector("#cancel-checkout").addEventListener("click", () => checkoutDialog.close());
@@ -1758,6 +1808,11 @@ document.querySelector("#confirm-payment").addEventListener("click", () => {
 	const paymentMethod = checkoutForm.querySelector('input[name="payment-method"]:checked')?.value;
 	if (paymentMethod) {
 		completePurchase(paymentMethod);
+	}
+});
+driverLoginForm.addEventListener("input", () => {
+	if (!isSupabaseConfigured()) {
+		document.querySelector("#driver-setup-notice").hidden = false;
 	}
 });
 paymentDetailsDialog.addEventListener("click", (event) => {
