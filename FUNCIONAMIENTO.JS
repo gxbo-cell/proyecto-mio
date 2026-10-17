@@ -393,7 +393,7 @@ function beginProductEdit(product) {
 	productCategoryInput.value = product.category;
 	productPriceInput.value = String(product.price);
 	productStockInput.value = String(product.stock);
-	document.querySelector("#submit-product-button").innerHTML = "<span aria-hidden=\"true\">✓</span> Guardar cambios";
+	document.querySelector("#submit-product-button").textContent = "✓ Guardar cambios";
 	document.querySelector("#cancel-edit-button").hidden = false;
 	showFeedback(`Editando ${product.name}.`);
 	productForm.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -403,7 +403,7 @@ function beginProductEdit(product) {
 function cancelProductEdit() {
 	editingProductId = null;
 	productForm.reset();
-	document.querySelector("#submit-product-button").innerHTML = "<span aria-hidden=\"true\">＋</span> Agregar al inventario";
+	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
 	document.querySelector("#cancel-edit-button").hidden = true;
 	formFeedback.textContent = "";
 	formFeedback.classList.remove("error");
@@ -415,6 +415,9 @@ function updateProductStock(productId, requestedStock) {
 	if (!product || !Number.isInteger(stock) || stock < 0) {
 		showFeedback("La existencia debe ser un número entero igual o mayor que cero.", true);
 		return;
+	}
+	if (editingProductId === productId) {
+		cancelProductEdit();
 	}
 	product.stock = stock;
 	if (getCartQuantity(productId) > stock) {
@@ -432,6 +435,9 @@ function deleteProduct(productId) {
 	const product = products.find((item) => item.id === productId);
 	if (!product || !window.confirm(`¿Eliminar "${product.name}" del inventario?`)) {
 		return;
+	}
+	if (editingProductId === productId) {
+		cancelProductEdit();
 	}
 	products = products.filter((item) => item.id !== productId);
 	cart = cart.filter((item) => item.productId !== productId);
@@ -1067,7 +1073,7 @@ productForm.addEventListener("submit", (event) => {
 	saveProducts();
 	productForm.reset();
 	editingProductId = null;
-	document.querySelector("#submit-product-button").innerHTML = "<span aria-hidden=\"true\">＋</span> Agregar al inventario";
+	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
 	document.querySelector("#cancel-edit-button").hidden = true;
 	showFeedback(editedProduct ? "Cambios guardados en el producto." : "Producto agregado al inventario.");
 
