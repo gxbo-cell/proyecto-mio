@@ -367,6 +367,7 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 @media (max-width: 820px) {
 	.workspace { grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; }
 	.admin-workspace { grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; }
+	.sales-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 	.stat:nth-child(3) { border-right: 0; }
@@ -381,6 +382,8 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 @media (max-width: 650px) {
 	.topbar { height: 60px; padding: 0 14px; gap: 8px; }
 	.page-shell { width: calc(100% - 36px); }
+	.sales-orders-panel { padding: 17px 14px; }
+	.sales-order-card { padding: 14px 12px 12px; }
 	.intro { align-items: flex-start; flex-direction: column; gap: 13px; padding: 34px 0 22px; }
 	h1 { font-size: 42px; }
 	.intro-copy { max-width: 340px; }
@@ -405,7 +408,8 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 	.product-card-controls .weight-quantity { width: 53px; }
 	.product-card-controls .weight-unit-select { padding: 0 2px; }
 	.view-switch { gap: 2px; padding: 3px; }
-	.view-switch-button { min-height: 30px; padding: 0 7px; font-size: 9px; }
+	.view-switch-button { min-height: 30px; gap: 4px; padding: 0 6px; font-size: 9px; }
+	.nav-badge { min-width: 15px; height: 15px; font-size: 8px; }
 	.form-panel { padding: 20px; }
 	.cart-panel { padding: 18px 20px; }
 	.checkout-dialog { padding: 21px; }
@@ -420,6 +424,12 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 	.map-picker-frame-wrap, .map-picker-map { min-height: 300px; }
 	.map-picker-selection { padding: 12px 14px; border-top: 1px solid var(--line); border-left: 0; }
 	.map-picker-actions button { min-width: 0; flex: 1; }
+	.sales-orders-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+	.sales-filter-wrap { width: 100%; justify-content: space-between; }
+	.sales-status-filter { flex: 1; }
+	.sales-order-footer { align-items: flex-start; flex-direction: column; }
+	.sales-order-actions { width: 100%; justify-content: flex-start; }
+	.sales-order-actions button { flex: 1; }
 	.page-footer { flex-direction: column; padding-top: 18px; }
 }
 
