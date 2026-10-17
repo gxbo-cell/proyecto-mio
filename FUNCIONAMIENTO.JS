@@ -114,6 +114,7 @@ let mapPlacesLayer;
 let mapPickerProvider = null;
 let googleMapsApiPromise;
 let googlePlacePredictions = [];
+let googleAutocompleteSessionToken = null;
 let deliveryFee = 0;
 let activeCategory = "Todos";
 let editingProductId = null;
@@ -1470,10 +1471,12 @@ async function searchMapLocation() {
 	mapPickerFeedback.textContent = "Buscando lugares...";
 	try {
 		if (mapPickerProvider === "google") {
-			const { AutocompleteSuggestion } = await window.google.maps.importLibrary("places");
+			const { AutocompleteSuggestion, AutocompleteSessionToken } = await window.google.maps.importLibrary("places");
+			googleAutocompleteSessionToken ||= new AutocompleteSessionToken();
 			const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
 				input: query,
-				locationBias: mapPickerMap.getBounds() || undefined
+				locationBias: mapPickerMap.getBounds() || undefined,
+				sessionToken: googleAutocompleteSessionToken
 			});
 			if (requestId !== mapSuggestionRequestId || query !== mapPickerInput.value.trim()) {
 				return;
@@ -1553,6 +1556,7 @@ function renderMapSuggestions() {
 
 async function selectGooglePlace(placeId) {
 	try {
+		googleAutocompleteSessionToken = null;
 		const { Place } = await window.google.maps.importLibrary("places");
 		const place = new Place({ id: placeId });
 		await place.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
@@ -1581,6 +1585,7 @@ async function selectMapSuggestion(index) {
 			try {
 				const googlePlace = prediction.toPlace();
 				await googlePlace.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+				googleAutocompleteSessionToken = null;
 				if (!googlePlace.location) {
 					mapPickerFeedback.textContent = "Google Maps no devolvió las coordenadas de ese lugar.";
 					return;
