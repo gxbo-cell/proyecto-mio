@@ -242,13 +242,19 @@ function getCartTotal() {
 
 function configureProductFormMode() {
 	const isWeight = productSaleModeInput.value === "weight";
+	const productBeingEdited = products.find((product) => product.id === editingProductId);
+	const legacyWeightCategory = productBeingEdited &&
+		["Carnes", "Charcutería"].includes(productBeingEdited.category) &&
+		!isWeightProduct(productBeingEdited);
 	productPriceLabel.textContent = isWeight ? "Precio (USD/kg)" : "Precio (USD c/u)";
 	productStockLabel.textContent = isWeight ? "Existencias iniciales (kg)" : "Cantidad inicial";
 	productStockInput.step = isWeight ? "0.001" : "1";
 	productStockInput.placeholder = isWeight ? "0.000" : "0";
 	productStockGuidance.textContent = isWeight
 		? "El precio se cobra por kg y el inventario se guarda en gramos. Puedes elegir g, kg o lb al comprar."
-		: "El precio y el inventario se controlan por unidad.";
+		: legacyWeightCategory
+			? "Este producto existente conserva sus unidades actuales. Para venderlo por peso, cambia la forma de venta e ingresa el stock real en kg; no se convertirá automáticamente."
+			: "El precio y el inventario se controlan por unidad.";
 }
 
 function getStoredStock(stockAmount, saleMode) {
