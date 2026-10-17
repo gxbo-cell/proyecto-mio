@@ -289,6 +289,39 @@
 				<p class="intro-copy">Administra productos, cantidades disponibles y artículos agotados.</p>
 			</section>
 
+			<section class="supabase-setup-panel" aria-labelledby="supabase-setup-title">
+				<div class="section-heading supabase-setup-heading">
+					<div>
+						<p class="eyebrow">CONEXIÓN DE LA TIENDA</p>
+						<h2 id="supabase-setup-title">Configurar pedidos y conductores</h2>
+					</div>
+					<span id="supabase-setup-status" class="setup-status">Sin configurar</span>
+				</div>
+				<p class="panel-copy">Conecta este programa a tu proyecto Supabase con la URL y la clave pública del proyecto. La clave se guarda solo en este navegador; nunca pegues aquí una clave secreta o service_role.</p>
+				<ol class="supabase-setup-steps">
+					<li>Crea un proyecto desde <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">Supabase Dashboard</a>.</li>
+					<li>En Project Settings → API, copia la URL del proyecto y su clave pública anon/publishable.</li>
+					<li>Abre <a href="./SUPABASE_SETUP.sql" target="_blank" rel="noreferrer">SUPABASE_SETUP.sql</a> y ejecútalo una vez en SQL Editor. Esto crea tablas, reglas privadas y el almacenamiento seguro de documentos.</li>
+					<li>Guarda y verifica la conexión aquí. Después, altas, documentos, pedidos e inventario local se usan desde este programa.</li>
+				</ol>
+				<form id="supabase-setup-form" class="supabase-setup-form">
+					<div>
+						<label class="field-label" for="supabase-project-url">URL del proyecto</label>
+						<input id="supabase-project-url" type="url" inputmode="url" autocomplete="url" placeholder="https://tu-proyecto.supabase.co" required>
+					</div>
+					<div>
+						<label class="field-label" for="supabase-public-key">Clave pública anon / publishable</label>
+						<input id="supabase-public-key" type="password" autocomplete="off" spellcheck="false" placeholder="sb_publishable_… o clave anon pública" required>
+					</div>
+					<div class="supabase-setup-actions">
+						<button id="supabase-setup-save" class="primary-button" type="submit">Verificar y guardar conexión</button>
+						<button id="supabase-setup-clear" class="secondary-button" type="button">Desconectar</button>
+					</div>
+					<p id="supabase-setup-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+				</form>
+				<p class="supabase-setup-security">La clave pública se guarda en el almacenamiento local de este navegador. No se incluye en el repositorio ni se envía a otro servicio. La contraseña de conductor y los documentos personales se procesan directamente con Supabase.</p>
+			</section>
+
 			<section class="stats" aria-label="Resumen del inventario">
 				<article class="stat"><span class="stat-label">Productos registrados</span><strong id="product-count" class="stat-value">0</strong></article>
 				<article class="stat"><span class="stat-label">Existencias en tienda</span><strong id="unit-count" class="stat-value">0</strong></article>
