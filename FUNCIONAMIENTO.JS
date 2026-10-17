@@ -185,6 +185,88 @@ function isSupabaseConfigured() {
 	return Boolean(supabaseConfig.url && supabaseConfig.anonKey);
 }
 
+function renderSupabaseConfiguration() {
+	supabaseSetupUrlInput.value = supabaseConfig.url;
+	supabaseSetupKeyInput.value = supabaseConfig.anonKey;
+	supabaseSetupClearButton.disabled = !isSupabaseConfigured();
+	supabaseSetupStatus.textContent = isSupabaseConfigured() ? "Conectado" : "Sin configurar";
+	supabaseSetupStatus.classList.toggle("is-connected", isSupabaseConfigured());
+}
+
+function validateSupabaseUrl(value) {
+	try {
+		const url = new URL(value.trim());
+		const isLocalDevelopment = ["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:";
+		if ((!isLocalDevelopment && url.protocol !== "https:") ||
+			url.username || url.password || url.search || url.hash || !url.hostname) {
+			return null;
+		}
+		return url.origin;
+	} catch {
+		return null;
+	}
+}
+
+async function configureSupabase(event) {
+	event.preventDefault();
+	if (!supabaseSetupForm.reportValidity()) {
+		return;
+	}
+	const url = validateSupabaseUrl(supabaseSetupUrlInput.value);
+	const anonKey = supabaseSetupKeyInput.value.trim();
+	if (!url || anonKey.length < 20) {
+		supabaseSetupFeedback.textContent = "Revisa la URL HTTPS del proyecto y la clave pública completa.";
+		return;
+	}
+	const previousConfig = supabaseConfig;
+	const candidateConfig = { url, anonKey };
+	const saveButtonLabel = supabaseSetupSaveButton.textContent;
+	supabaseSetupSaveButton.disabled = true;
+	supabaseSetupFeedback.textContent = "Comprobando conexión y esquema seguro...";
+	try {
+		supabaseConfig = candidateConfig;
+		const setupStatus = await callSupabaseFunction("check_store_setup", {});
+		if (setupStatus?.ready !== true) {
+			throw new Error("Supabase responde, pero faltan tablas, permisos o el almacenamiento privado. Ejecuta SUPABASE_SETUP.sql en SQL Editor y vuelve a intentarlo.");
+		}
+		try {
+			localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(candidateConfig));
+		} catch {
+			throw new Error("La conexión funcionó, pero el navegador no permitió guardar la configuración.");
+		}
+		if (previousConfig.url !== candidateConfig.url || previousConfig.anonKey !== candidateConfig.anonKey) {
+			driverSession = null;
+			window.clearInterval(driverOrdersTimer);
+			driverOrdersTimer = null;
+			localStorage.removeItem(DRIVER_SESSION_KEY);
+		}
+		supabaseConfig = candidateConfig;
+		supabaseSetupFeedback.textContent = "Conexión y esquema verificados. Ya puedes registrar conductores y recibir pedidos.";
+		renderSupabaseConfiguration();
+		renderDriverSession();
+	} catch (error) {
+		supabaseConfig = previousConfig;
+		supabaseSetupFeedback.textContent = `No se pudo guardar la conexión: ${error.message}`;
+	} finally {
+		supabaseSetupSaveButton.disabled = false;
+		supabaseSetupSaveButton.textContent = saveButtonLabel;
+	}
+}
+
+function disconnectSupabase() {
+	supabaseConfig = { url: "", anonKey: "" };
+	localStorage.removeItem(SUPABASE_CONFIG_KEY);
+	localStorage.removeItem(DRIVER_SESSION_KEY);
+	driverSession = null;
+	window.clearInterval(driverOrdersTimer);
+	driverOrdersTimer = null;
+	availableOrders.replaceChildren();
+	myDriverOrders.replaceChildren();
+	supabaseSetupFeedback.textContent = "Conexión eliminada de este navegador.";
+	renderSupabaseConfiguration();
+	renderDriverSession();
+}
+
 async function supabaseRequest(path, { method = "GET", body, token } = {}) {
 	if (!isSupabaseConfigured()) {
 		throw new Error("Falta configurar la URL del proyecto y la clave pública de Supabase en FUNCIONAMIENTO.JS.");
