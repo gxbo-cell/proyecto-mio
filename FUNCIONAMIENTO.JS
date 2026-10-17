@@ -1232,7 +1232,7 @@ function getOrderItemsSnapshot() {
 			quantity: weightProduct ? item.quantity / GRAMS_PER_KILOGRAM : item.quantity,
 			unit: weightProduct ? "kg" : "unidad",
 			price_per_unit: product.price,
-			line_total: Number(lineTotal.toFixed(2))
+			line_total: lineTotal
 		};
 	});
 }
