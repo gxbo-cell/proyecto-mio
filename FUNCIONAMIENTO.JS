@@ -1258,6 +1258,9 @@ async function searchMapLocation() {
 		if (requestId !== mapSuggestionRequestId || query !== mapPickerInput.value.trim()) {
 			return;
 		}
+		if (!Array.isArray(data.features)) {
+			throw new Error("La respuesta de búsqueda no es válida.");
+		}
 		mapSuggestionItems = data.features
 			.map((feature) => ({
 				label: formatMapSuggestion(feature.properties),
@@ -1304,7 +1307,7 @@ function selectMapSuggestion(index) {
 		return;
 	}
 	hideMapSuggestions();
-	setMapPickerSelection({ lat: place.latitude, lng: place.longitude });
+	void setMapPickerSelection({ lat: place.latitude, lng: place.longitude });
 	mapPickerInput.value = place.label;
 	mapPickerFeedback.textContent = "Lugar encontrado. Ajusta el pin si hace falta y confirma la ubicación.";
 	updateMapPicker();
@@ -1778,8 +1781,12 @@ deliveryMapLink.addEventListener("input", () => {
 useCurrentLocationButton.addEventListener("click", useCurrentLocation);
 openMapPickerButton.addEventListener("click", openMapPicker);
 mapPickerInput.addEventListener("input", () => {
+	mapSuggestionRequestId++;
 	mapPickerCoordinates = null;
-	mapPickerFeedback.textContent = "Buscando dirección...";
+	hideMapSuggestions();
+	mapPickerFeedback.textContent = mapPickerInput.value.trim().length >= 3
+		? "Buscando sugerencias..."
+		: "Escribe al menos 3 caracteres para ver sugerencias.";
 	document.querySelector("#map-picker-selection-summary").textContent = "Busca y marca un punto en el mapa";
 	document.querySelector("#map-picker-coordinates").textContent = "";
 	if (mapPickerMarker && mapPickerMap) {
@@ -1787,14 +1794,38 @@ mapPickerInput.addEventListener("input", () => {
 		mapPickerMarker = null;
 	}
 	window.clearTimeout(mapPickerSearchTimer);
-	mapPickerSearchTimer = window.setTimeout(searchMapLocation, 1000);
+	if (mapPickerInput.value.trim().length >= 3) {
+		mapPickerSearchTimer = window.setTimeout(searchMapLocation, 450);
+	}
 });
 document.querySelector("#search-map-location").addEventListener("click", searchMapLocation);
 mapPickerInput.addEventListener("keydown", (event) => {
-	if (event.key === "Enter") {
+	if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+		if (mapSuggestionItems.length === 0) {
+			return;
+		}
+		event.preventDefault();
+		const direction = event.key === "ArrowDown" ? 1 : -1;
+		activeMapSuggestionIndex = activeMapSuggestionIndex < 0
+			? direction === 1 ? 0 : mapSuggestionItems.length - 1
+			: (activeMapSuggestionIndex + direction + mapSuggestionItems.length) % mapSuggestionItems.length;
+		for (const [index, option] of [...mapPickerSuggestions.children].entries()) {
+			const isSelected = index === activeMapSuggestionIndex;
+			option.setAttribute("aria-selected", String(isSelected));
+			if (isSelected) {
+				mapPickerInput.setAttribute("aria-activedescendant", option.id);
+			}
+		}
+	} else if (event.key === "Enter") {
 		event.preventDefault();
 		window.clearTimeout(mapPickerSearchTimer);
-		searchMapLocation();
+		if (activeMapSuggestionIndex >= 0) {
+			selectMapSuggestion(activeMapSuggestionIndex);
+		} else {
+			searchMapLocation();
+		}
+	} else if (event.key === "Escape") {
+		hideMapSuggestions();
 	}
 });
 mapPickerCurrentLocationButton.addEventListener("click", useLocationInPicker);
