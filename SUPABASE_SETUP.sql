@@ -242,10 +242,10 @@ set search_path = public, auth, storage, pg_temp
 as $$
 begin
 	if auth.uid() is null
+		or p_document_type is null
 		or p_document_type not in ('identity', 'license', 'vehicle_registration', 'insurance')
 		or p_object_path is null
-		or split_part(p_object_path, '/', 1) <> auth.uid()::text
-		or split_part(p_object_path, '/', 2) <> p_document_type
+		or p_object_path <> auth.uid()::text || '/' || p_document_type || '/document'
 		or not exists (
 			select 1 from storage.objects
 			where bucket_id = 'driver-documents' and name = p_object_path
@@ -569,6 +569,9 @@ revoke all on function public.accept_delivery_order(uuid) from public;
 revoke all on function public.update_delivery_order_status(uuid, text) from public;
 revoke all on function public.get_delivery_tracking(uuid) from public;
 revoke all on function public.get_my_driver_profile() from public;
+revoke all on function public.register_my_driver_profile(text, text, text, date, text, text, date, text, text, text, text, text, integer, text, text, text, text, date) from public;
+revoke all on function public.record_my_driver_document(text, text) from public;
+revoke all on function public.activate_my_driver_profile() from public;
 
 grant execute on function public.create_delivery_order(uuid, text, text, jsonb, numeric, numeric, text, double precision, double precision, text) to anon, authenticated;
 grant execute on function public.list_available_delivery_orders() to authenticated;
@@ -577,3 +580,6 @@ grant execute on function public.accept_delivery_order(uuid) to authenticated;
 grant execute on function public.update_delivery_order_status(uuid, text) to authenticated;
 grant execute on function public.get_delivery_tracking(uuid) to anon, authenticated;
 grant execute on function public.get_my_driver_profile() to authenticated;
+grant execute on function public.register_my_driver_profile(text, text, text, date, text, text, date, text, text, text, text, text, integer, text, text, text, text, date) to authenticated;
+grant execute on function public.record_my_driver_document(text, text) to authenticated;
+grant execute on function public.activate_my_driver_profile() to authenticated;
