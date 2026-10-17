@@ -15,6 +15,13 @@ const WEIGHT_UNITS = {
 	kg: { grams: GRAMS_PER_KILOGRAM, step: "0.001", minimum: "0.001" },
 	lb: { grams: GRAMS_PER_POUND, step: "0.01", minimum: "0.01" }
 };
+try {
+	localStorage.removeItem("la-tiendita-supabase-config-v1");
+	localStorage.removeItem("la-tiendita-driver-session-v1");
+	localStorage.removeItem("la-tiendita-latest-delivery-v1");
+} catch {
+	// The app can still run when browser storage is unavailable.
+}
 const currencyFormatter = new Intl.NumberFormat("en-US", {
 	style: "currency",
 	currency: "USD"
