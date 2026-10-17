@@ -1169,12 +1169,12 @@ function openMapPicker() {
 		: "Busca una dirección o toca el mapa para colocar el pin.";
 	updateMapPicker();
 	mapPickerDialog.showModal();
-	window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+	window.setTimeout(() => {
 		if (mapPickerMap) {
-			mapPickerMap.invalidateSize();
+			mapPickerMap.invalidateSize({ pan: false });
 			loadNearbyPlaces();
 		}
-	}));
+	}, 100);
 }
 
 function updateMapPicker() {
