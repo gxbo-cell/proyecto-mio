@@ -114,7 +114,6 @@ let mapPlacesLayer;
 let mapPickerProvider = null;
 let googleMapsApiPromise;
 let googlePlacePredictions = [];
-let googleMapsAuthFailed = false;
 let deliveryFee = 0;
 let activeCategory = "Todos";
 let editingProductId = null;
@@ -1234,7 +1233,6 @@ function loadGoogleMapsApi() {
 }
 
 window.gm_authFailure = () => {
-	googleMapsAuthFailed = true;
 	mapPickerFeedback.textContent = "Google Maps rechazó la clave. Verifica las API habilitadas y la restricción del dominio.";
 	mapBusinessFeedback.textContent = "No se pudieron cargar los comercios de Google Maps.";
 };
@@ -1436,6 +1434,7 @@ function hideMapSuggestions() {
 	mapPickerInput.setAttribute("aria-expanded", "false");
 	mapPickerInput.removeAttribute("aria-activedescendant");
 	mapSuggestionItems = [];
+	googlePlacePredictions = [];
 	activeMapSuggestionIndex = -1;
 }
 
@@ -2087,7 +2086,11 @@ mapPickerInput.addEventListener("input", () => {
 	document.querySelector("#map-picker-selection-summary").textContent = "Busca y marca un punto en el mapa";
 	document.querySelector("#map-picker-coordinates").textContent = "";
 	if (mapPickerMarker && mapPickerMap) {
-		mapPickerMap.removeLayer(mapPickerMarker);
+		if (mapPickerProvider === "google") {
+			mapPickerMarker.setMap(null);
+		} else {
+			mapPickerMap.removeLayer(mapPickerMarker);
+		}
 		mapPickerMarker = null;
 	}
 	window.clearTimeout(mapPickerSearchTimer);
