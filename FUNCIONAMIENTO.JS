@@ -1150,6 +1150,8 @@ function updateDeliveryMap() {
 }
 
 function openMapPicker() {
+	mapSuggestionRequestId++;
+	hideMapSuggestions();
 	mapPickerCoordinates = deliveryCoordinates
 		? { ...deliveryCoordinates }
 		: getCoordinatesFromMapLink(getValidatedMapLink());
