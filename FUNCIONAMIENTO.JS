@@ -1450,7 +1450,7 @@ function formatMapSuggestion(properties) {
 }
 
 async function searchMapLocation() {
-	if (!window.L || !mapPickerMap) {
+	if (!mapPickerMap) {
 		mapPickerFeedback.textContent = "El mapa todavía no está listo. Cierra y vuelve a abrir el selector cuando tengas conexión.";
 		return;
 	}
@@ -1467,6 +1467,31 @@ async function searchMapLocation() {
 	const requestId = ++mapSuggestionRequestId;
 	mapPickerFeedback.textContent = "Buscando lugares...";
 	try {
+		if (mapPickerProvider === "google") {
+			const { AutocompleteSuggestion } = await window.google.maps.importLibrary("places");
+			const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+				input: query,
+				locationBias: mapPickerMap.getBounds() || undefined
+			});
+			if (requestId !== mapSuggestionRequestId || query !== mapPickerInput.value.trim()) {
+				return;
+			}
+			googlePlacePredictions = suggestions
+				.map((suggestion) => suggestion.placePrediction)
+				.filter(Boolean);
+			mapSuggestionItems = googlePlacePredictions.map((prediction) => ({
+				label: prediction.text.toString(),
+				googlePlace: true
+			}));
+			if (mapSuggestionItems.length === 0) {
+				hideMapSuggestions();
+				mapPickerFeedback.textContent = "Google Maps no encontró ese lugar. Prueba otra búsqueda o marca el punto.";
+				return;
+			}
+			renderMapSuggestions();
+			mapPickerFeedback.textContent = "Elige un lugar de Google Maps para colocar el pin.";
+			return;
+		}
 		const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`, {
 			headers: { Accept: "application/json" }
 		});
@@ -1492,22 +1517,7 @@ async function searchMapLocation() {
 			mapPickerFeedback.textContent = "No encontramos ese lugar. Prueba otra dirección o toca el mapa.";
 			return;
 		}
-		activeMapSuggestionIndex = -1;
-		mapPickerSuggestions.replaceChildren(...mapSuggestionItems.map((place, index) => {
-			const option = document.createElement("li");
-			option.id = `map-picker-suggestion-${index}`;
-			option.setAttribute("role", "option");
-			option.setAttribute("aria-selected", "false");
-			const button = document.createElement("button");
-			button.type = "button";
-			button.textContent = place.label;
-			button.addEventListener("pointerdown", (event) => event.preventDefault());
-			button.addEventListener("click", () => selectMapSuggestion(index));
-			option.append(button);
-			return option;
-		}));
-		mapPickerSuggestions.hidden = false;
-		mapPickerInput.setAttribute("aria-expanded", "true");
+		renderMapSuggestions();
 		mapPickerFeedback.textContent = "Elige una dirección de la lista para colocar el pin.";
 	} catch (error) {
 		if (requestId !== mapSuggestionRequestId) {
@@ -1520,31 +1530,96 @@ async function searchMapLocation() {
 	}
 }
 
-function selectMapSuggestion(index) {
+function renderMapSuggestions() {
+	activeMapSuggestionIndex = -1;
+	mapPickerSuggestions.replaceChildren(...mapSuggestionItems.map((place, index) => {
+		const option = document.createElement("li");
+		option.id = `map-picker-suggestion-${index}`;
+		option.setAttribute("role", "option");
+		option.setAttribute("aria-selected", "false");
+		const button = document.createElement("button");
+		button.type = "button";
+		button.textContent = place.label;
+		button.addEventListener("pointerdown", (event) => event.preventDefault());
+		button.addEventListener("click", () => { void selectMapSuggestion(index); });
+		option.append(button);
+		return option;
+	}));
+	mapPickerSuggestions.hidden = false;
+	mapPickerInput.setAttribute("aria-expanded", "true");
+}
+
+async function selectGooglePlace(placeId) {
+	try {
+		const { Place } = await window.google.maps.importLibrary("places");
+		const place = new Place({ id: placeId });
+		await place.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+		if (!place.location) {
+			mapPickerFeedback.textContent = "Google Maps no devolvió las coordenadas de ese lugar.";
+			return;
+		}
+		await setMapPickerSelection({
+			lat: place.location.lat(),
+			lng: place.location.lng()
+		}, false, place.formattedAddress || place.displayName?.text);
+	} catch (error) {
+		mapPickerFeedback.textContent = `No se pudo abrir ese lugar de Google Maps: ${error.message}`;
+	}
+}
+
+async function selectMapSuggestion(index) {
 	const place = mapSuggestionItems[index];
 	if (!place) {
 		return;
 	}
 	hideMapSuggestions();
+	if (place.googlePlace) {
+		const prediction = googlePlacePredictions[index];
+		if (prediction) {
+			try {
+				const googlePlace = prediction.toPlace();
+				await googlePlace.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+				if (!googlePlace.location) {
+					mapPickerFeedback.textContent = "Google Maps no devolvió las coordenadas de ese lugar.";
+					return;
+				}
+				await setMapPickerSelection({
+					lat: googlePlace.location.lat(),
+					lng: googlePlace.location.lng()
+				}, false, googlePlace.formattedAddress || googlePlace.displayName?.text);
+			} catch (error) {
+				mapPickerFeedback.textContent = `No se pudo cargar el lugar: ${error.message}`;
+			}
+		}
+		return;
+	}
 	void setMapPickerSelection({ lat: place.latitude, lng: place.longitude });
 	mapPickerInput.value = place.label;
 	mapPickerFeedback.textContent = "Lugar encontrado. Ajusta el pin si hace falta y confirma la ubicación.";
-	updateMapPicker();
+	void updateMapPicker();
 }
 
-async function setMapPickerSelection(point, reverseGeocode = false) {
+async function setMapPickerSelection(point, reverseGeocode = false, displayName = "") {
 	mapPickerCoordinates = { latitude: point.lat, longitude: point.lng };
-	mapPickerMap.setView([point.lat, point.lng], Math.max(mapPickerMap.getZoom(), 15));
-	if (mapPickerMarker) {
-		mapPickerMarker.setLatLng([point.lat, point.lng]);
+	if (mapPickerProvider === "google") {
+		const position = { lat: point.lat, lng: point.lng };
+		mapPickerMap.setCenter(position);
+		mapPickerMap.setZoom(Math.max(mapPickerMap.getZoom(), 15));
+		mapPickerMarker.setPosition(position);
+		mapPickerMarker.setMap(mapPickerMap);
 	} else {
-		mapPickerMarker = L.marker([point.lat, point.lng], { draggable: true }).addTo(mapPickerMap);
-		mapPickerMarker.on("dragend", () => setMapPickerSelection(mapPickerMarker.getLatLng(), true));
+		mapPickerMap.setView([point.lat, point.lng], Math.max(mapPickerMap.getZoom(), 15));
+		if (mapPickerMarker) {
+			mapPickerMarker.setLatLng([point.lat, point.lng]);
+		} else {
+			mapPickerMarker = L.marker([point.lat, point.lng], { draggable: true }).addTo(mapPickerMap);
+			mapPickerMarker.on("dragend", () => setMapPickerSelection(mapPickerMarker.getLatLng(), true));
+		}
 	}
-	mapPickerInput.value = `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
+	mapPickerInput.value = displayName || `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
 	mapPickerFeedback.textContent = "Punto marcado. Puedes arrastrar el pin para afinarlo.";
-	updateMapPicker();
-	if (!reverseGeocode) {
+	void updateMapPicker();
+	if (!reverseGeocode || mapPickerProvider === "google") {
 		return;
 	}
 	try {
@@ -1556,7 +1631,7 @@ async function setMapPickerSelection(point, reverseGeocode = false) {
 		if (result.display_name) {
 			mapPickerInput.value = result.display_name;
 			mapPickerFeedback.textContent = "Dirección encontrada. Confirma para agregarla al pedido.";
-			updateMapPicker();
+			void updateMapPicker();
 		}
 	} catch {
 		mapPickerFeedback.textContent = "Punto marcado. Se guardarán las coordenadas seleccionadas.";
