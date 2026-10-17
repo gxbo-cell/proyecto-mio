@@ -35,6 +35,7 @@ const bolivarFormatter = new Intl.NumberFormat("es-VE", {
 const productForm = document.querySelector("#product-form");
 const productNameInput = document.querySelector("#product-name");
 const productCategoryInput = document.querySelector("#product-category");
+const productCategoryHint = document.querySelector("#product-category-hint");
 const productSaleModeInput = document.querySelector("#product-sale-mode");
 const productPriceInput = document.querySelector("#product-price");
 const productStockInput = document.querySelector("#product-stock");
@@ -102,6 +103,50 @@ let mapPickerMarker;
 let deliveryFee = 0;
 let activeCategory = "Todos";
 let editingProductId = null;
+let isSuggestingProductCategory = false;
+
+const productCategoryKeywords = [
+	["Charcutería", ["mortadela", "salchicha", "chorizo", "salami", "tocineta", "tocino", "pepperoni", "jamon"]],
+	["Carnes", ["carne molida", "carne", "res", "bistec", "churrasco", "costilla", "pollo", "pechuga", "muslo", "alas", "pavo", "cerdo", "cochino", "chuleta", "pernil", "lomo"]],
+	["Lácteos", ["leche", "queso", "yogurt", "yogur", "mantequilla", "margarina", "crema de leche", "nata"]],
+	["Bebidas", ["refresco", "gaseosa", "jugo", "malta", "cerveza", "vino", "ron", "whisky", "vodka", "agua", "bebida", "te frio"]],
+	["Víveres", ["arroz", "pasta", "harina", "aceite", "azucar", "cafe", "cereal", "caraota", "lenteja", "frijol", "atun", "sardina", "salsa", "mayonesa", "ketchup", "mostaza", "galleta", "pan", "avena", "granos", "sal"]],
+	["Otros", ["jabon", "detergente", "limpieza", "desinfectante", "papel higienico", "servilleta", "shampoo", "champu", "crema dental", "pañal"]]
+].flatMap(([category, keywords]) => keywords.map((keyword) => ({ category, keyword })))
+	.sort((first, second) => second.keyword.length - first.keyword.length);
+
+function normalizeProductText(value) {
+	return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+}
+
+function suggestProductCategory(name) {
+	const normalizedName = normalizeProductText(name).replace(/[^\p{L}\p{N}]+/gu, " ");
+	return productCategoryKeywords.find(({ keyword }) =>
+		(` ${normalizedName} `).includes(` ${keyword} `)
+	)?.category || null;
+}
+
+function updateProductCategorySuggestion() {
+	if (editingProductId) {
+		return;
+	}
+	const suggestedCategory = suggestProductCategory(productNameInput.value);
+	if (!suggestedCategory) {
+		productCategoryHint.textContent = productNameInput.value.trim()
+			? "No reconocí la categoría; puedes elegirla manualmente."
+			: "";
+		return;
+	}
+	if (productCategoryInput.value === suggestedCategory) {
+		productCategoryHint.textContent = `Categoría sugerida: ${suggestedCategory}. Puedes cambiarla si hace falta.`;
+		return;
+	}
+	isSuggestingProductCategory = true;
+	productCategoryInput.value = suggestedCategory;
+	productCategoryInput.dispatchEvent(new Event("change"));
+	isSuggestingProductCategory = false;
+	productCategoryHint.textContent = `Categoría sugerida: ${suggestedCategory}. Puedes cambiarla si hace falta.`;
+}
 
 function loadProducts() {
 	try {
@@ -735,6 +780,7 @@ function beginProductEdit(product) {
 	editingProductId = product.id;
 	productNameInput.value = product.name;
 	productCategoryInput.value = product.category;
+	productCategoryHint.textContent = "La categoría no cambiará automáticamente mientras editas.";
 	productSaleModeInput.value = product.saleMode;
 	productPriceInput.value = String(product.price);
 	productStockInput.value = String(getStockAmount(product));
@@ -749,6 +795,7 @@ function beginProductEdit(product) {
 function cancelProductEdit() {
 	editingProductId = null;
 	productForm.reset();
+	productCategoryHint.textContent = "";
 	configureProductFormMode();
 	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
 	document.querySelector("#cancel-edit-button").hidden = true;
@@ -1480,6 +1527,7 @@ productForm.addEventListener("submit", (event) => {
 	}
 	saveProducts();
 	productForm.reset();
+	productCategoryHint.textContent = "";
 	configureProductFormMode();
 	editingProductId = null;
 	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
@@ -1505,8 +1553,12 @@ productForm.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#cancel-edit-button").addEventListener("click", cancelProductEdit);
+productNameInput.addEventListener("input", updateProductCategorySuggestion);
 productCategoryInput.addEventListener("change", () => {
 	const nextMode = ["Carnes", "Charcutería"].includes(productCategoryInput.value) ? "weight" : "unit";
+	if (!isSuggestingProductCategory) {
+		productCategoryHint.textContent = "Categoría seleccionada manualmente.";
+	}
 	if (nextMode !== productSaleModeInput.value) {
 		productStockInput.value = "";
 		productSaleModeInput.value = nextMode;
