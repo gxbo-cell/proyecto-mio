@@ -3,10 +3,6 @@
 const STORAGE_KEY = "la-tiendita-inventory-v1";
 const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v1";
 const RATE_ENDPOINT = "https://ve.dolarapi.com/v1/dolares/oficial";
-const DELIVERY_STORAGE_KEY = "la-tiendita-latest-delivery-v1";
-const DRIVER_SESSION_KEY = "la-tiendita-driver-session-v1";
-const SUPABASE_CONFIG_KEY = "la-tiendita-supabase-config-v1";
-let supabaseConfig = loadSupabaseConfig();
 const DELIVERY_ORIGIN = { latitude: 10.4806, longitude: -66.9036 };
 const DELIVERY_ZONE_KM = 5;
 const DELIVERY_ZONE_PRICE = 1;
@@ -63,8 +59,6 @@ const checkoutFeedback = document.querySelector("#checkout-feedback");
 const deliveryToggle = document.querySelector("#delivery-toggle");
 const deliveryFields = document.querySelector("#delivery-fields");
 const deliveryAddress = document.querySelector("#delivery-address");
-const deliveryCustomerName = document.querySelector("#delivery-customer-name");
-const deliveryCustomerPhone = document.querySelector("#delivery-customer-phone");
 const deliveryFeedback = document.querySelector("#delivery-feedback");
 const checkoutDelivery = document.querySelector("#checkout-delivery");
 const deliveryMapLink = document.querySelector("#delivery-map-link");
@@ -81,29 +75,6 @@ const mapPickerInput = document.querySelector("#map-picker-input");
 const mapPickerMapElement = document.querySelector("#map-picker-map");
 const mapPickerFeedback = document.querySelector("#map-picker-feedback");
 const mapPickerCurrentLocationButton = document.querySelector("#map-picker-current-location");
-const driverLoginForm = document.querySelector("#driver-login-form");
-const driverLoginFeedback = document.querySelector("#driver-login-feedback");
-const driverLoginPanel = document.querySelector(".driver-login-panel");
-const driverSessionPanel = document.querySelector("#driver-session");
-const driverRegistrationDialog = document.querySelector("#driver-registration-dialog");
-const driverRegistrationForm = document.querySelector("#driver-registration-form");
-const driverRegistrationFeedback = document.querySelector("#driver-registration-feedback");
-const openDriverRegistrationButton = document.querySelector("#open-driver-registration");
-const continueDriverRegistrationButton = document.querySelector("#continue-driver-registration");
-const registrationAccountFields = document.querySelector("#registration-account-fields");
-const registrationEmailInput = document.querySelector("#registration-email");
-const registrationPasswordInput = document.querySelector("#registration-password");
-const supabaseSetupForm = document.querySelector("#supabase-setup-form");
-const supabaseSetupUrlInput = document.querySelector("#supabase-project-url");
-const supabaseSetupKeyInput = document.querySelector("#supabase-public-key");
-const supabaseSetupFeedback = document.querySelector("#supabase-setup-feedback");
-const supabaseSetupStatus = document.querySelector("#supabase-setup-status");
-const supabaseSetupSaveButton = document.querySelector("#supabase-setup-save");
-const supabaseSetupClearButton = document.querySelector("#supabase-setup-clear");
-const availableOrders = document.querySelector("#available-orders");
-const myDriverOrders = document.querySelector("#my-driver-orders");
-const availableOrdersEmpty = document.querySelector("#available-orders-empty");
-const myOrdersEmpty = document.querySelector("#my-orders-empty");
 
 let products = loadProducts();
 let cart = [];
@@ -114,12 +85,8 @@ let mapPickerSearchTimer;
 let mapPickerMap;
 let mapPickerMarker;
 let deliveryFee = 0;
-let latestDelivery = loadLatestDelivery();
 let activeCategory = "Todos";
 let editingProductId = null;
-let driverSession = loadDriverSession();
-let driverOrdersTimer;
-let trackingTimer;
 
 function loadProducts() {
 	try {
@@ -150,161 +117,6 @@ function loadCachedRate() {
 	} catch {
 		return null;
 	}
-}
-
-function loadLatestDelivery() {
-	try {
-		const savedDelivery = JSON.parse(localStorage.getItem(DELIVERY_STORAGE_KEY) || "null");
-		return savedDelivery && typeof savedDelivery.trackingCode === "string" ? savedDelivery : null;
-	} catch {
-		return null;
-	}
-}
-
-function loadDriverSession() {
-	try {
-		const savedSession = JSON.parse(localStorage.getItem(DRIVER_SESSION_KEY) || "null");
-		return savedSession && typeof savedSession.access_token === "string" ? savedSession : null;
-	} catch {
-		return null;
-	}
-}
-
-function loadSupabaseConfig() {
-	try {
-		const config = JSON.parse(localStorage.getItem(SUPABASE_CONFIG_KEY) || "null");
-		return config && typeof config.url === "string" && typeof config.anonKey === "string"
-			? config
-			: { url: "", anonKey: "" };
-	} catch {
-		return { url: "", anonKey: "" };
-	}
-}
-
-function isSupabaseConfigured() {
-	return Boolean(supabaseConfig.url && supabaseConfig.anonKey);
-}
-
-function renderSupabaseConfiguration() {
-	supabaseSetupUrlInput.value = supabaseConfig.url;
-	supabaseSetupKeyInput.value = supabaseConfig.anonKey;
-	supabaseSetupClearButton.disabled = !isSupabaseConfigured();
-	supabaseSetupStatus.textContent = isSupabaseConfigured() ? "Conectado" : "Sin configurar";
-	supabaseSetupStatus.classList.toggle("is-connected", isSupabaseConfigured());
-}
-
-function validateSupabaseUrl(value) {
-	try {
-		const url = new URL(value.trim());
-		const isLocalDevelopment = ["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:";
-		if ((!isLocalDevelopment && url.protocol !== "https:") ||
-			url.username || url.password || url.search || url.hash || !url.hostname) {
-			return null;
-		}
-		return url.origin;
-	} catch {
-		return null;
-	}
-}
-
-async function configureSupabase(event) {
-	event.preventDefault();
-	if (!supabaseSetupForm.reportValidity()) {
-		return;
-	}
-	const url = validateSupabaseUrl(supabaseSetupUrlInput.value);
-	const anonKey = supabaseSetupKeyInput.value.trim();
-	if (!url || anonKey.length < 20) {
-		supabaseSetupFeedback.textContent = "Revisa la URL HTTPS del proyecto y la clave pública completa.";
-		return;
-	}
-	const previousConfig = supabaseConfig;
-	const candidateConfig = { url, anonKey };
-	const saveButtonLabel = supabaseSetupSaveButton.textContent;
-	supabaseSetupSaveButton.disabled = true;
-	supabaseSetupFeedback.textContent = "Comprobando conexión y esquema seguro...";
-	try {
-		supabaseConfig = candidateConfig;
-		const setupStatus = await callSupabaseFunction("check_store_setup", {});
-		if (setupStatus?.ready !== true) {
-			throw new Error("Supabase responde, pero faltan tablas, permisos o el almacenamiento privado. Ejecuta SUPABASE_SETUP.sql en SQL Editor y vuelve a intentarlo.");
-		}
-		try {
-			localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(candidateConfig));
-		} catch {
-			throw new Error("La conexión funcionó, pero el navegador no permitió guardar la configuración.");
-		}
-		if (previousConfig.url !== candidateConfig.url || previousConfig.anonKey !== candidateConfig.anonKey) {
-			driverSession = null;
-			window.clearInterval(driverOrdersTimer);
-			driverOrdersTimer = null;
-			localStorage.removeItem(DRIVER_SESSION_KEY);
-		}
-		supabaseConfig = candidateConfig;
-		supabaseSetupFeedback.textContent = "Conexión y esquema verificados. Ya puedes registrar conductores y recibir pedidos.";
-		renderSupabaseConfiguration();
-		renderDriverSession();
-	} catch (error) {
-		supabaseConfig = previousConfig;
-		supabaseSetupFeedback.textContent = `No se pudo guardar la conexión: ${error.message}`;
-	} finally {
-		supabaseSetupSaveButton.disabled = false;
-		supabaseSetupSaveButton.textContent = saveButtonLabel;
-	}
-}
-
-function disconnectSupabase() {
-	supabaseConfig = { url: "", anonKey: "" };
-	localStorage.removeItem(SUPABASE_CONFIG_KEY);
-	localStorage.removeItem(DRIVER_SESSION_KEY);
-	driverSession = null;
-	window.clearInterval(driverOrdersTimer);
-	driverOrdersTimer = null;
-	availableOrders.replaceChildren();
-	myDriverOrders.replaceChildren();
-	supabaseSetupFeedback.textContent = "Conexión eliminada de este navegador.";
-	renderSupabaseConfiguration();
-	renderDriverSession();
-}
-
-async function supabaseRequest(path, { method = "GET", body, token } = {}) {
-	if (!isSupabaseConfigured()) {
-		throw new Error("Falta configurar la URL del proyecto y la clave pública de Supabase en FUNCIONAMIENTO.JS.");
-	}
-	const headers = {
-		apikey: supabaseConfig.anonKey,
-		Authorization: "Bearer " + (token || supabaseConfig.anonKey)
-	};
-	if (body !== undefined) {
-		headers["Content-Type"] = "application/json";
-	}
-	const response = await fetch(`${supabaseConfig.url.replace(/\/$/, "")}${path}`, {
-		method,
-		headers,
-		body: body === undefined ? undefined : JSON.stringify(body)
-	});
-	const responseBody = await response.text();
-	let data = null;
-	if (responseBody) {
-		try {
-			data = JSON.parse(responseBody);
-		} catch {
-			throw new Error("Supabase devolvió una respuesta que no se pudo interpretar.");
-		}
-	}
-	if (!response.ok) {
-		const message = data?.msg || data?.message || data?.hint || data?.error_description || data?.error;
-		throw new Error(message || `La solicitud a Supabase falló (${response.status}).`);
-	}
-	return data;
-}
-
-async function callSupabaseFunction(name, body, token) {
-	return supabaseRequest(`/rest/v1/rpc/${encodeURIComponent(name)}`, {
-		method: "POST",
-		body,
-		token
-	});
 }
 
 async function loadDailyRate() {
