@@ -9,6 +9,13 @@ const DELIVERY_ZONE_KM = 5;
 const DELIVERY_ZONE_PRICE = 1;
 const DISCOUNT_THRESHOLD = 50;
 const DISCOUNT_RATE = 0.1;
+const GRAMS_PER_KILOGRAM = 1000;
+const GRAMS_PER_POUND = 453.59237;
+const WEIGHT_UNITS = {
+	g: { grams: 1, step: "1", minimum: "1" },
+	kg: { grams: GRAMS_PER_KILOGRAM, step: "0.001", minimum: "0.001" },
+	lb: { grams: GRAMS_PER_POUND, step: "0.01", minimum: "0.01" }
+};
 const currencyFormatter = new Intl.NumberFormat("en-US", {
 	style: "currency",
 	currency: "USD"
@@ -21,8 +28,12 @@ const bolivarFormatter = new Intl.NumberFormat("es-VE", {
 const productForm = document.querySelector("#product-form");
 const productNameInput = document.querySelector("#product-name");
 const productCategoryInput = document.querySelector("#product-category");
+const productSaleModeInput = document.querySelector("#product-sale-mode");
 const productPriceInput = document.querySelector("#product-price");
 const productStockInput = document.querySelector("#product-stock");
+const productPriceLabel = document.querySelector("#product-price-label");
+const productStockLabel = document.querySelector("#product-stock-label");
+const productStockGuidance = document.querySelector("#product-stock-guidance");
 const productList = document.querySelector("#product-list");
 const catalogProducts = document.querySelector("#catalog-products");
 const emptyState = document.querySelector("#empty-state");
@@ -90,9 +101,10 @@ function loadProducts() {
 				Number.isInteger(product.stock) && product.stock >= 0
 			).map((product) => ({
 				...product,
-				category: ["Carnes", "Víveres", "Bebidas", "Lácteos", "Otros"].includes(product.category)
+				category: ["Carnes", "Charcutería", "Víveres", "Bebidas", "Lácteos", "Otros"].includes(product.category)
 					? product.category
-					: "Otros"
+					: "Otros",
+				saleMode: product.saleMode === "weight" ? "weight" : "unit"
 			}))
 			: [];
 	} catch {
@@ -179,6 +191,29 @@ function formatBolivars(amount) {
 	return exchangeRate ? `Bs. ${bolivarFormatter.format(amount * exchangeRate.value)}` : "Tasa no disponible";
 }
 
+function formatQuantity(amount, maximumFractionDigits = 3) {
+	return new Intl.NumberFormat("es-VE", { maximumFractionDigits }).format(amount);
+}
+
+function isWeightProduct(product) {
+	return product.saleMode === "weight";
+}
+
+function formatWeight(grams) {
+	return grams >= GRAMS_PER_KILOGRAM
+		? `${formatQuantity(grams / GRAMS_PER_KILOGRAM)} kg`
+		: `${formatQuantity(grams)} g`;
+}
+
+function getStockAmount(product) {
+	return isWeightProduct(product) ? product.stock / GRAMS_PER_KILOGRAM : product.stock;
+}
+
+function getCartLineTotal(product, quantity) {
+	const priceQuantity = isWeightProduct(product) ? quantity / GRAMS_PER_KILOGRAM : quantity;
+	return getDiscountedPrice(product.price) * priceQuantity;
+}
+
 function getDiscountedPrice(price) {
 	return price > DISCOUNT_THRESHOLD ? price * (1 - DISCOUNT_RATE) : price;
 }
@@ -195,8 +230,34 @@ function getCartQuantity(productId) {
 function getCartTotal() {
 	return cart.reduce((total, item) => {
 		const product = products.find((entry) => entry.id === item.productId);
-		return product ? total + getDiscountedPrice(product.price) * item.quantity : total;
+		return product ? total + getCartLineTotal(product, item.quantity) : total;
 	}, 0);
+}
+
+function configureProductFormMode() {
+	const isWeight = productSaleModeInput.value === "weight";
+	productPriceLabel.textContent = isWeight ? "Precio (USD/kg)" : "Precio (USD c/u)";
+	productStockLabel.textContent = isWeight ? "Existencias iniciales (kg)" : "Cantidad inicial";
+	productStockInput.step = isWeight ? "0.001" : "1";
+	productStockInput.placeholder = isWeight ? "0.000" : "0";
+	productStockGuidance.textContent = isWeight
+		? "El precio se cobra por kg y el inventario se guarda en gramos. Puedes elegir g, kg o lb al comprar."
+		: "El precio y el inventario se controlan por unidad.";
+}
+
+function getStoredStock(stockAmount, saleMode) {
+	return saleMode === "weight"
+		? Math.round(stockAmount * GRAMS_PER_KILOGRAM)
+		: stockAmount;
+}
+
+function getWeightQuantityInGrams(amount, unit) {
+	const conversion = WEIGHT_UNITS[unit];
+	const parsedAmount = Number(amount);
+	if (!conversion || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+		return null;
+	}
+	return Math.round(parsedAmount * conversion.grams);
 }
 
 function getOrderTotal() {
