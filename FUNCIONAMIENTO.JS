@@ -546,6 +546,189 @@ function renderAdminProducts() {
 	productList.closest(".table-wrap").scrollLeft = 0;
 }
 
+function getOrderDisplayId(order) {
+	return `#${order.id.slice(-6).toLocaleUpperCase("es")}`;
+}
+
+function getOrderStatusLabel(status) {
+	return {
+		pending: "Por aceptar",
+		accepted: "En preparación",
+		completed: "Completado",
+		rejected: "Rechazado"
+	}[status] || "Pedido";
+}
+
+function renderSales() {
+	const pendingOrders = orders.filter((order) => order.status === "pending");
+	const acceptedOrders = orders.filter((order) => order.status === "accepted");
+	const completedOrders = orders.filter((order) => order.status === "completed");
+	const revenueOrders = orders.filter((order) => ["accepted", "completed"].includes(order.status));
+	document.querySelector("#sales-pending-count").textContent = String(pendingOrders.length);
+	document.querySelector("#sales-accepted-count").textContent = String(acceptedOrders.length);
+	document.querySelector("#sales-completed-count").textContent = String(completedOrders.length);
+	document.querySelector("#sales-revenue").textContent = formatMoney(
+		revenueOrders.reduce((total, order) => total + order.total, 0)
+	);
+	pendingOrderCount.textContent = String(pendingOrders.length);
+	pendingOrderCount.hidden = pendingOrders.length === 0;
+
+	const visibleOrders = orders.filter((order) =>
+		salesStatusFilter.value === "all" || order.status === salesStatusFilter.value
+	);
+	salesOrdersList.replaceChildren();
+	for (const order of visibleOrders) {
+		const card = document.createElement("article");
+		card.className = `sales-order-card sales-order-${order.status}`;
+		const header = document.createElement("div");
+		header.className = "sales-order-header";
+		const heading = document.createElement("div");
+		heading.className = "sales-order-heading";
+		const id = document.createElement("strong");
+		id.className = "sales-order-id";
+		id.textContent = `Pedido ${getOrderDisplayId(order)}`;
+		const timestamp = document.createElement("time");
+		timestamp.className = "sales-order-time";
+		timestamp.dateTime = order.createdAt;
+		timestamp.textContent = new Intl.DateTimeFormat("es-VE", {
+			day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
+		}).format(new Date(order.createdAt));
+		heading.append(id, timestamp);
+		const status = document.createElement("span");
+		status.className = `sales-order-status status-${order.status}`;
+		status.textContent = getOrderStatusLabel(order.status);
+		header.append(heading, status);
+
+		const details = document.createElement("div");
+		details.className = "sales-order-details";
+		const method = document.createElement("span");
+		method.textContent = `Pago: ${order.paymentMethod}`;
+		const fulfillment = document.createElement("span");
+		fulfillment.textContent = order.delivery?.location
+			? "Delivery por coordinar"
+			: "Retiro en tienda";
+		details.append(method, fulfillment);
+
+		const itemList = document.createElement("ul");
+		itemList.className = "sales-order-items";
+		for (const item of order.items) {
+			const itemRow = document.createElement("li");
+			const itemName = document.createElement("span");
+			itemName.className = "sales-order-item-name";
+			itemName.textContent = item.name;
+			const itemDescription = document.createElement("small");
+			itemDescription.textContent = item.saleMode === "weight"
+				? `${formatWeight(item.quantity)} × ${formatMoney(item.price)}/kg`
+				: `${formatQuantity(item.quantity, 0)} × ${formatMoney(item.price)}`;
+			const itemPrice = document.createElement("strong");
+			itemPrice.textContent = formatMoney(item.lineTotal);
+			const itemCopy = document.createElement("span");
+			itemCopy.className = "sales-order-item-copy";
+			itemCopy.append(itemName, itemDescription);
+			itemRow.append(itemCopy, itemPrice);
+			itemList.append(itemRow);
+		}
+
+		const footer = document.createElement("div");
+		footer.className = "sales-order-footer";
+		const totalWrap = document.createElement("div");
+		totalWrap.className = "sales-order-total-wrap";
+		const totalLabel = document.createElement("span");
+		totalLabel.textContent = order.delivery?.fee ? "Total · incluye delivery" : "Total del pedido";
+		const total = document.createElement("strong");
+		total.textContent = formatMoney(order.total);
+		totalWrap.append(totalLabel, total);
+		const actions = document.createElement("div");
+		actions.className = "sales-order-actions";
+		if (order.status === "pending") {
+			actions.append(
+				createOrderAction(order.id, "reject", "Rechazar", "sales-reject-button"),
+				createOrderAction(order.id, "accept", "Aceptar pedido", "sales-accept-button")
+			);
+		} else if (order.status === "accepted") {
+			actions.append(createOrderAction(order.id, "complete", "Marcar como completado", "sales-accept-button"));
+		}
+		footer.append(totalWrap, actions);
+		card.append(header, details, itemList);
+		if (order.delivery?.location) {
+			const address = document.createElement("p");
+			address.className = "sales-order-address";
+			address.textContent = `Entrega: ${order.delivery.location}`;
+			card.append(address);
+		}
+		card.append(footer);
+		salesOrdersList.append(card);
+	}
+	salesEmptyState.hidden = orders.length > 0;
+	salesOrdersList.hidden = visibleOrders.length === 0;
+}
+
+function createOrderAction(orderId, action, label, className) {
+	const button = document.createElement("button");
+	button.type = "button";
+	button.className = className;
+	button.dataset.orderId = orderId;
+	button.dataset.orderAction = action;
+	button.textContent = label;
+	return button;
+}
+
+function updateOrderStatus(orderId, nextStatus) {
+	const order = orders.find((entry) => entry.id === orderId);
+	if (!order || !(
+		(order.status === "pending" && ["accepted", "rejected"].includes(nextStatus)) ||
+		(order.status === "accepted" && nextStatus === "completed")
+	)) {
+		return;
+	}
+
+	const previousStatus = order.status;
+	const previousStocks = [];
+	if (nextStatus === "accepted") {
+		for (const item of order.items) {
+			const product = products.find((entry) => entry.id === item.productId);
+			if (!product || product.stock < item.quantity) {
+				salesFeedback.textContent = `No se pudo aceptar ${getOrderDisplayId(order)}: faltan existencias para ${item.name}. Revisa el inventario.`;
+				return;
+			}
+			previousStocks.push({ product, stock: product.stock });
+		}
+		for (const item of order.items) {
+			products.find((entry) => entry.id === item.productId).stock -= item.quantity;
+		}
+		if (!saveProducts(false)) {
+			for (const { product, stock } of previousStocks) {
+				product.stock = stock;
+			}
+			salesFeedback.textContent = "No se pudo guardar el inventario en este navegador; el pedido sigue pendiente.";
+			return;
+		}
+	}
+
+	order.status = nextStatus;
+	if (!saveOrders()) {
+		order.status = previousStatus;
+		for (const { product, stock } of previousStocks) {
+			product.stock = stock;
+		}
+		if (previousStocks.length > 0) {
+			saveProducts(false);
+		}
+		salesFeedback.textContent = "No se pudo guardar el cambio en este navegador. Inténtalo de nuevo.";
+		return;
+	}
+
+	salesFeedback.textContent = nextStatus === "accepted"
+		? `${getOrderDisplayId(order)} aceptado. El inventario se actualizó.`
+		: nextStatus === "rejected"
+			? `${getOrderDisplayId(order)} rechazado.`
+			: `${getOrderDisplayId(order)} marcado como completado.`;
+	if (nextStatus === "accepted") {
+		renderProducts();
+	}
+	renderSales();
+}
+
 function beginProductEdit(product) {
 	editingProductId = product.id;
 	productNameInput.value = product.name;
