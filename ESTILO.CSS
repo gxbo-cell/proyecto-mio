@@ -84,6 +84,7 @@ h2 { margin-bottom: 0; font-family: "DM Serif Display", Georgia, serif; font-siz
 .product-card:hover { transform: translateY(-2px); border-color: #cbd8cb; }
 .product-card-visual { min-height: 105px; display: grid; place-items: center; color: #536b50; background: linear-gradient(135deg, #edf2e9, #f6f2e9); font-size: 42px; }
 .product-card-visual.category-carnes { background: linear-gradient(135deg, #f6e8df, #fbf2eb); }
+.product-card-visual.category-charcuteria { background: linear-gradient(135deg, #f7eee0, #fbf6e9); }
 .product-card-visual.category-bebidas { background: linear-gradient(135deg, #e5f0eb, #f0f5ed); }
 .product-card-visual.category-lacteos { background: linear-gradient(135deg, #e9eef3, #f5f4ef); }
 .product-card-details { min-height: 126px; padding: 11px 12px 6px; }
@@ -98,6 +99,9 @@ h2 { margin-bottom: 0; font-family: "DM Serif Display", Georgia, serif; font-siz
 .product-card-price .rate-price { flex-basis: 100%; margin-top: 0; }
 .product-card-controls { display: flex; align-items: center; gap: 6px; padding: 0 12px 12px; }
 .product-card-controls .buy-button { flex: 1; }
+.product-card-controls .weight-quantity { width: 58px; }
+.weight-unit-select { height: 29px; padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: #fffefa; font: 10px "DM Sans", sans-serif; }
+.product-card-price strong { white-space: nowrap; }
 .product-card-soldout { opacity: .82; }
 .product-card-soldout .product-card-visual { filter: saturate(.6); }
 .product-card-controls .buy-button:disabled { background: #c6c8bf; }
@@ -132,6 +136,7 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .form-panel input { width: 100%; height: 37px; padding: 0 10px; border: 1px solid #e7e4db; border-radius: 3px; outline: none; color: var(--ink); background: #fffefa; font-size: 11px; }
 .form-panel select { width: 100%; height: 37px; margin-bottom: 14px; padding: 0 10px; border: 1px solid #e7e4db; border-radius: 3px; outline: none; color: var(--ink); background: #fffefa; font: 11px "DM Sans", sans-serif; }
 .form-panel select:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(49, 92, 72, .1); }
+.stock-guidance { margin: -7px 0 13px; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .form-panel input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(49, 92, 72, .1); }
 .form-panel input::placeholder { color: #b5b5ad; }
 #product-name { margin-bottom: 14px; }
@@ -159,6 +164,8 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .cart-item-price { color: var(--muted); font-size: 10px; }
 .cart-item-controls { display: flex; align-items: center; gap: 5px; }
 .cart-item-quantity { width: 42px; height: 28px; padding: 3px; border: 1px solid var(--line); border-radius: 3px; text-align: center; font-size: 10px; }
+.cart-weight-controls .cart-item-quantity { width: 62px; }
+.cart-weight-unit-select { height: 28px; font-size: 9px; }
 .remove-item { width: 26px; height: 28px; border: 0; border-radius: 3px; color: #9a5948; background: #fbefea; font-size: 18px; line-height: 1; }
 .cart-total-row { display: flex; align-items: center; justify-content: space-between; margin: 13px 0; padding-top: 11px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .cart-total-values { display: grid; justify-items: end; gap: 3px; }
@@ -380,6 +387,8 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 	.product-card-details { min-height: 120px; padding-right: 9px; padding-left: 9px; }
 	.product-card-controls { padding: 0 9px 10px; }
 	.product-card-controls .buy-button { padding: 0 5px; font-size: 9px; }
+	.product-card-controls .weight-quantity { width: 53px; }
+	.product-card-controls .weight-unit-select { padding: 0 2px; }
 	.view-switch-button { padding: 0 10px; }
 	.form-panel { padding: 20px; }
 	.cart-panel { padding: 18px 20px; }
