@@ -1,6 +1,7 @@
 "use strict";
 
 const STORAGE_KEY = "la-tiendita-inventory-v1";
+const ORDER_STORAGE_KEY = "la-tiendita-orders-v1";
 const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v1";
 const RATE_ENDPOINT = "https://ve.dolarapi.com/v1/dolares/oficial";
 const DELIVERY_ORIGIN = { latitude: 10.4806, longitude: -66.9036 };
@@ -82,8 +83,14 @@ const mapPickerInput = document.querySelector("#map-picker-input");
 const mapPickerMapElement = document.querySelector("#map-picker-map");
 const mapPickerFeedback = document.querySelector("#map-picker-feedback");
 const mapPickerCurrentLocationButton = document.querySelector("#map-picker-current-location");
+const salesOrdersList = document.querySelector("#sales-orders-list");
+const salesEmptyState = document.querySelector("#sales-empty-state");
+const salesFeedback = document.querySelector("#sales-feedback");
+const salesStatusFilter = document.querySelector("#sales-status-filter");
+const pendingOrderCount = document.querySelector("#pending-order-count");
 
 let products = loadProducts();
+let orders = loadOrders();
 let cart = [];
 let exchangeRate = loadCachedRate();
 let deliveryCoordinates = null;
@@ -111,6 +118,23 @@ function loadProducts() {
 					: "Otros",
 				saleMode: product.saleMode === "weight" ? "weight" : "unit"
 			}))
+			: [];
+	} catch {
+		return [];
+	}
+}
+
+function loadOrders() {
+	try {
+		const savedOrders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY) || "[]");
+		return Array.isArray(savedOrders)
+			? savedOrders.filter((order) =>
+				order && typeof order.id === "string" &&
+				typeof order.createdAt === "string" && Number.isFinite(Date.parse(order.createdAt)) &&
+				["pending", "accepted", "completed", "rejected"].includes(order.status) &&
+				Number.isFinite(order.total) && order.total >= 0 &&
+				Array.isArray(order.items) && order.items.length > 0
+			)
 			: [];
 	} catch {
 		return [];
@@ -171,11 +195,24 @@ function renderExchangeRate(prefix = "Fecha valor · ") {
 	}).format(new Date(exchangeRate.date))}`;
 }
 
-function saveProducts() {
+function saveProducts(showError = true) {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+		return true;
 	} catch {
-		showFeedback("No se pudo guardar en este navegador.", true);
+		if (showError) {
+			showFeedback("No se pudo guardar en este navegador.", true);
+		}
+		return false;
+	}
+}
+
+function saveOrders() {
+	try {
+		localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
+		return true;
+	} catch {
+		return false;
 	}
 }
 
