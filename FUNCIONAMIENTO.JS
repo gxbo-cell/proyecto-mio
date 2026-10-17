@@ -1549,10 +1549,11 @@ function configureDriverRegistrationForm() {
 	if (signedIn && driverSession.user?.email) {
 		registrationEmailInput.value = driverSession.user.email;
 	}
-	const today = new Date().toISOString().slice(0, 10);
+	const currentDate = new Date();
+	const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(currentDate.getDate()).padStart(2, "0")}`;
 	document.querySelector("#registration-license-expiry").min = today;
 	document.querySelector("#registration-insurance-expiry").min = today;
-	document.querySelector("#registration-vehicle-year").max = String(new Date().getFullYear() + 1);
+	document.querySelector("#registration-vehicle-year").max = String(currentDate.getFullYear() + 1);
 }
 
 function getDriverRegistrationPayload() {
