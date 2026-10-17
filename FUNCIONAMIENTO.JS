@@ -808,9 +808,13 @@ function openCheckout() {
 		openMapPickerButton.focus();
 		return;
 	}
-	if (deliveryToggle.checked && !deliveryDriver.value.trim()) {
-		deliveryFeedback.textContent = "Asigna un conductor antes de cerrar el pedido con delivery.";
-		deliveryDriver.focus();
+	if (deliveryToggle.checked && (!deliveryCustomerName.value.trim() || !deliveryCustomerPhone.value.trim())) {
+		deliveryFeedback.textContent = "Ingresa el nombre y teléfono de quien recibirá el pedido.";
+		(!deliveryCustomerName.value.trim() ? deliveryCustomerName : deliveryCustomerPhone).focus();
+		return;
+	}
+	if (deliveryToggle.checked && !isSupabaseConfigured()) {
+		deliveryFeedback.textContent = "Para enviar pedidos a conductores necesitas configurar Supabase. Revisa SUPABASE_SETUP.sql y la configuración al inicio de FUNCIONAMIENTO.JS.";
 		return;
 	}
 	deliveryFeedback.textContent = "";
@@ -822,7 +826,9 @@ function openCheckout() {
 	checkoutTotal.textContent = formatMoney(getOrderTotal());
 	document.querySelector("#checkout-total-bs").textContent = formatBolivars(getOrderTotal());
 	checkoutDelivery.hidden = !deliveryToggle.checked;
-	checkoutDelivery.textContent = deliveryToggle.checked ? `Delivery · ${getDeliveryLocation()} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})` : "";
+	checkoutDelivery.textContent = deliveryToggle.checked
+		? `Delivery · ${getDeliveryLocation()} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)}) · Esperando que un conductor acepte el pedido.`
+		: "";
 	checkoutDialog.showModal();
 }
 
@@ -900,20 +906,31 @@ function openMapPicker() {
 		? `${deliveryCoordinates.latitude.toFixed(6)}, ${deliveryCoordinates.longitude.toFixed(6)}`
 		: deliveryAddress.value.trim() || getMapSearchQuery();
 	mapPickerFeedback.textContent = mapPickerInput.value
-		? "Ajusta la búsqueda y toca el mapa para colocar el pin."
+		? "Busca la dirección y marca el punto exacto en el mapa."
 		: "Busca una dirección o toca el mapa para colocar el pin.";
 	updateMapPicker();
 	mapPickerDialog.showModal();
-	window.setTimeout(() => mapPickerMap.invalidateSize(), 50);
+	window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+		if (mapPickerMap) {
+			mapPickerMap.invalidateSize();
+		}
+	}));
 }
 
 function updateMapPicker() {
 	if (!mapPickerMap) {
+		if (!window.L) {
+			mapPickerFeedback.textContent = "El mapa interactivo no está disponible. Revisa tu conexión y abre La Tiendita desde localhost o un sitio HTTPS.";
+			return;
+		}
 		mapPickerMap = L.map(mapPickerMapElement, { scrollWheelZoom: true }).setView([DELIVERY_ORIGIN.latitude, DELIVERY_ORIGIN.longitude], 12);
-		L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+		const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 			maxZoom: 19,
 			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
 		}).addTo(mapPickerMap);
+		tileLayer.once("tileerror", () => {
+			mapPickerFeedback.textContent = "No se pudieron cargar las calles del mapa. Prueba de nuevo o busca la dirección y confirma el pin.";
+		});
 		mapPickerMap.on("click", (event) => setMapPickerSelection(event.latlng, true));
 	}
 	if (mapPickerCoordinates) {
@@ -939,6 +956,10 @@ function updateMapPicker() {
 }
 
 async function searchMapLocation() {
+	if (!window.L || !mapPickerMap) {
+		mapPickerFeedback.textContent = "El mapa todavía no está listo. Cierra y vuelve a abrir el selector cuando tengas conexión.";
+		return;
+	}
 	const query = mapPickerInput.value.trim();
 	if (!query) {
 		mapPickerFeedback.textContent = "Escribe una dirección o lugar para buscar.";
@@ -946,7 +967,9 @@ async function searchMapLocation() {
 	}
 	mapPickerFeedback.textContent = "Buscando lugar...";
 	try {
-		const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`);
+		const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=es&q=${encodeURIComponent(query)}`, {
+			headers: { Accept: "application/json" }
+		});
 		if (!response.ok) {
 			throw new Error("Búsqueda no disponible");
 		}
@@ -960,8 +983,10 @@ async function searchMapLocation() {
 		mapPickerCoordinates = { latitude: Number(result.lat), longitude: Number(result.lon) };
 		mapPickerFeedback.textContent = "Lugar encontrado. Toca el mapa para ajustar el pin y confirma la ubicación.";
 		updateMapPicker();
-	} catch {
-		mapPickerFeedback.textContent = "No pudimos buscar la dirección. Puedes tocar el mapa o usar tu ubicación actual.";
+	} catch (error) {
+		mapPickerFeedback.textContent = error instanceof TypeError
+			? "La búsqueda del mapa no respondió. Revisa la conexión o marca el punto manualmente en el mapa."
+			: `No se pudo buscar la dirección: ${error.message}`;
 	}
 }
 
@@ -1257,7 +1282,8 @@ function completePurchase(paymentMethod) {
 	cart = [];
 	deliveryToggle.checked = false;
 	deliveryAddress.value = "";
-	deliveryDriver.value = "";
+	deliveryCustomerName.value = "";
+	deliveryCustomerPhone.value = "";
 	deliveryMapLink.value = "";
 	deliveryCoordinates = null;
 	deliveryFee = 0;
