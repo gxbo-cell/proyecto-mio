@@ -314,6 +314,12 @@ function renderProducts() {
 	document.querySelector("#out-of-stock-count").textContent = String(
 		products.filter((product) => product.stock === 0).length
 	);
+	const exhaustedCount = products.filter((product) => product.stock === 0).length;
+	const adminStockAlert = document.querySelector("#admin-stock-alert");
+	adminStockAlert.hidden = exhaustedCount === 0;
+	adminStockAlert.textContent = exhaustedCount === 0
+		? ""
+		: `${exhaustedCount} ${exhaustedCount === 1 ? "producto agotado requiere" : "productos agotados requieren"} reposición. Filtra el inventario para revisarlos.`;
 	document.querySelector("#inventory-value").textContent = formatMoney(
 		products.reduce((total, product) => total + getDiscountedPrice(product.price) * product.stock, 0)
 	);
@@ -1009,6 +1015,7 @@ productForm.addEventListener("submit", (event) => {
 		id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
 		name,
 		price,
+		category: productCategoryInput.value,
 		stock
 	});
 	saveProducts();
@@ -1018,6 +1025,8 @@ productForm.addEventListener("submit", (event) => {
 	if (stock === 0) {
 		stockAlert.textContent = `¡Atención! ${name} se registró sin unidades disponibles.`;
 		stockAlert.hidden = false;
+		document.querySelector("#admin-stock-alert").textContent = `“${name}” fue agregado sin existencias.`;
+		document.querySelector("#admin-stock-alert").hidden = false;
 	} else {
 		stockAlert.hidden = true;
 	}
@@ -1025,6 +1034,33 @@ productForm.addEventListener("submit", (event) => {
 });
 
 searchInput.addEventListener("input", renderProducts);
+inventorySearchInput.addEventListener("input", renderAdminProducts);
+stockFilter.addEventListener("change", renderAdminProducts);
+document.querySelector("#category-filters").addEventListener("click", (event) => {
+	const button = event.target.closest("[data-category]");
+	if (!button) {
+		return;
+	}
+	activeCategory = button.dataset.category;
+	document.querySelectorAll(".category-filter").forEach((filterButton) => {
+		const isActive = filterButton === button;
+		filterButton.classList.toggle("active", isActive);
+		filterButton.setAttribute("aria-pressed", String(isActive));
+	});
+	renderProducts();
+});
+document.querySelectorAll(".view-switch-button").forEach((button) => {
+	button.addEventListener("click", () => {
+		document.querySelectorAll(".view-switch-button").forEach((viewButton) => {
+			const isActive = viewButton === button;
+			viewButton.classList.toggle("active", isActive);
+			viewButton.setAttribute("aria-pressed", String(isActive));
+		});
+		document.querySelectorAll(".app-view").forEach((view) => {
+			view.hidden = view.id !== button.dataset.viewTarget;
+		});
+	});
+});
 deliveryToggle.addEventListener("change", () => {
 	deliveryFields.hidden = !deliveryToggle.checked;
 	deliveryFeedback.textContent = "";
@@ -1115,6 +1151,11 @@ paymentDetailsDialog.addEventListener("click", (event) => {
 	}
 });
 document.querySelector("#today-date").textContent = new Intl.DateTimeFormat("es", {
+	day: "numeric",
+	month: "long",
+	year: "numeric"
+}).format(new Date()).toLocaleUpperCase("es");
+document.querySelector("#admin-date").textContent = new Intl.DateTimeFormat("es", {
 	day: "numeric",
 	month: "long",
 	year: "numeric"
