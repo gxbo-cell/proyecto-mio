@@ -85,6 +85,14 @@ const driverLoginForm = document.querySelector("#driver-login-form");
 const driverLoginFeedback = document.querySelector("#driver-login-feedback");
 const driverLoginPanel = document.querySelector(".driver-login-panel");
 const driverSessionPanel = document.querySelector("#driver-session");
+const driverRegistrationDialog = document.querySelector("#driver-registration-dialog");
+const driverRegistrationForm = document.querySelector("#driver-registration-form");
+const driverRegistrationFeedback = document.querySelector("#driver-registration-feedback");
+const openDriverRegistrationButton = document.querySelector("#open-driver-registration");
+const continueDriverRegistrationButton = document.querySelector("#continue-driver-registration");
+const registrationAccountFields = document.querySelector("#registration-account-fields");
+const registrationEmailInput = document.querySelector("#registration-email");
+const registrationPasswordInput = document.querySelector("#registration-password");
 const availableOrders = document.querySelector("#available-orders");
 const myDriverOrders = document.querySelector("#my-driver-orders");
 const availableOrdersEmpty = document.querySelector("#available-orders-empty");
@@ -165,7 +173,7 @@ async function supabaseRequest(path, { method = "GET", body, token } = {}) {
 	}
 	const headers = {
 		apikey: SUPABASE_ANON_KEY,
-		Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`
+		Authorization: "Bearer " + (token || SUPABASE_ANON_KEY)
 	};
 	if (body !== undefined) {
 		headers["Content-Type"] = "application/json";
