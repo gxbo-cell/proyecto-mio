@@ -308,7 +308,8 @@ function renderProducts() {
 		const lowStock = product.stock > 0 && product.stock <= (weightProduct ? 3000 : 3);
 		card.className = `product-card${product.stock === 0 ? " product-card-soldout" : ""}`;
 		const visual = document.createElement("div");
-		visual.className = `product-card-visual category-${product.category.toLocaleLowerCase("es").replace("á", "a").replace("é", "e")}`;
+		const normalizedCategory = product.category.toLocaleLowerCase("es").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+		visual.className = `product-card-visual category-${normalizedCategory}`;
 		visual.setAttribute("aria-hidden", "true");
 		visual.textContent = ({ Carnes: "🥩", "Charcutería": "🧀", Víveres: "🛒", Bebidas: "🥤", "Lácteos": "🥛", Otros: "🌿" })[product.category];
 		const details = document.createElement("div");
@@ -318,7 +319,13 @@ function renderProducts() {
 		category.textContent = product.category;
 		const status = document.createElement("span");
 		status.className = `product-status${product.stock === 0 ? " sold-out" : lowStock ? " low-stock" : ""}`;
-		status.textContent = product.stock === 0 ? "Agotado" : lowStock ? "Pocas unidades" : "Disponible";
+		status.textContent = product.stock === 0
+			? "Agotado"
+			: weightProduct
+				? `${formatWeight(product.stock)} disponibles`
+				: lowStock
+					? `Quedan ${product.stock}`
+					: "Disponible";
 		const name = document.createElement("h3");
 		name.className = "product-card-name";
 		name.textContent = product.name;
