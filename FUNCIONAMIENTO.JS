@@ -817,6 +817,11 @@ function openCheckout() {
 		deliveryFeedback.textContent = "Para enviar pedidos a conductores necesitas configurar Supabase. Revisa SUPABASE_SETUP.sql y la configuración al inicio de FUNCIONAMIENTO.JS.";
 		return;
 	}
+	if (deliveryToggle.checked && !deliveryAddress.value.trim()) {
+		deliveryFeedback.textContent = "Añade la dirección o una referencia para la entrega.";
+		deliveryAddress.focus();
+		return;
+	}
 	deliveryFeedback.textContent = "";
 	checkoutFeedback.textContent = "";
 	checkoutForm.reset();
@@ -1242,7 +1247,7 @@ async function createSharedDeliveryOrder(paymentMethod) {
 	try {
 		localStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(latestDelivery));
 	} catch {
-		throw new Error(`El pedido fue enviado, pero el navegador no guardó el código. Anótalo: ${trackingCode}`);
+		showFeedback(`El pedido fue enviado. Guarda este código privado de seguimiento: ${trackingCode}`);
 	}
 	return trackingCode;
 }
@@ -1341,8 +1346,9 @@ async function completePurchase(paymentMethod) {
 		product.stock -= item.quantity;
 	}
 
+	const createdTrackingCode = deliveryLocation ? latestDelivery.trackingCode : "";
 	const itemCount = purchasedItems.length;
-	purchaseMessage.textContent = `${itemCount} ${itemCount === 1 ? "artículo" : "artículos"} · ${paymentMethod}`;
+	purchaseMessage.textContent = `${itemCount} ${itemCount === 1 ? "artículo" : "artículos"} · ${paymentMethod}${createdTrackingCode ? ` · Código ${createdTrackingCode}` : ""}`;
 	purchaseTotal.textContent = formatMoney(total);
 	document.querySelector("#purchase-total-bs").textContent = formatBolivars(total);
 	document.querySelector("#purchase-delivery").textContent = deliveryLocation
