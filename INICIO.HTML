@@ -21,7 +21,6 @@
 		</a>
 		<nav class="view-switch" aria-label="Secciones de la tienda">
 			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true">Compras</button>
-			<button class="view-switch-button" type="button" data-view-target="driver-view" aria-pressed="false">Conductor</button>
 			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Administración</button>
 		</nav>
 	</header>
@@ -105,39 +104,10 @@
 							<div><span class="eyebrow">COSTO ESTIMADO</span><strong id="delivery-fee">$1.00</strong><small id="delivery-zone-description">Zona inicial · hasta 5 km</small></div>
 							<strong id="delivery-fee-bs" class="delivery-fee-bs"></strong>
 						</div>
-						<label class="field-label driver-field" for="delivery-customer-name">Nombre de quien recibe</label>
-						<input id="delivery-customer-name" class="map-link-input" type="text" maxlength="100" autocomplete="name" placeholder="Nombre y apellido">
-						<label class="field-label driver-field" for="delivery-customer-phone">Teléfono de contacto</label>
-						<input id="delivery-customer-phone" class="map-link-input" type="tel" maxlength="30" autocomplete="tel" placeholder="Ej. 0412 123 4567">
-						<p class="delivery-note">El pedido aparecerá a los conductores disponibles. Tu nombre, teléfono y dirección se comparten con el conductor que lo acepte.</p>
+						<p class="delivery-note">El pedido se guarda solo en este dispositivo; la aplicación no lo envía a conductores. Coordina la entrega directamente con la tienda.</p>
 						<p class="delivery-note">Tarifa estimada: $1 por cada 5 km desde Caracas centro.</p>
 					</div>
 					<p id="delivery-feedback" class="form-feedback error" role="status" aria-live="polite"></p>
-				</section>
-
-				<section id="delivery-tracking" class="tracking-panel" aria-labelledby="tracking-title" hidden>
-					<div class="tracking-header">
-						<div>
-							<p class="eyebrow">SEGUIMIENTO DE ENTREGA</p>
-							<h2 id="tracking-title">Tu pedido</h2>
-						</div>
-						<span id="tracking-status-badge" class="tracking-status-badge">Esperando conductor</span>
-					</div>
-					<p id="tracking-headline" class="tracking-headline">Tu pedido se enviará a los conductores disponibles.</p>
-					<p id="tracking-driver" class="tracking-driver"></p>
-					<div id="tracking-driver-details" class="tracking-driver-details" hidden></div>
-					<p id="tracking-code" class="tracking-code"></p>
-					<form id="tracking-lookup-form" class="tracking-lookup-form">
-						<label class="field-label" for="tracking-lookup-code">¿Perdiste el seguimiento? Ingresa tu código privado</label>
-						<div><input id="tracking-lookup-code" type="text" inputmode="text" autocomplete="off" placeholder="Código del pedido" required><button class="secondary-button" type="submit">Buscar</button></div>
-						<p id="tracking-lookup-feedback" class="form-feedback" role="status" aria-live="polite"></p>
-					</form>
-					<div class="tracking-progress" aria-hidden="true"><span id="tracking-progress-fill"></span></div>
-					<ol class="tracking-steps">
-						<li><span class="tracking-step"><span class="tracking-step-marker">1</span><span class="tracking-step-label">Recogió el pedido</span></span></li>
-						<li><span class="tracking-step"><span class="tracking-step-marker">2</span><span class="tracking-step-label">Pedido en camino</span></span></li>
-						<li><span class="tracking-step"><span class="tracking-step-marker">3</span><span class="tracking-step-label">Pedido entregado</span></span></li>
-					</ol>
 				</section>
 
 				<section class="receipt-panel" aria-labelledby="receipt-title">
@@ -152,134 +122,6 @@
 			</div>
 		</section>
 
-		<section id="driver-view" class="app-view" aria-labelledby="driver-page-title" hidden>
-			<section class="intro">
-				<div>
-					<p class="eyebrow">REPARTOS DE LA TIENDA <span>·</span> <span id="driver-date"></span></p>
-					<h1 id="driver-page-title">Pedidos,<br><span>en camino.</span></h1>
-				</div>
-				<p class="intro-copy">Conéctate para ver los pedidos pendientes, aceptar uno y actualizar su entrega.</p>
-			</section>
-			<div id="driver-setup-notice" class="backend-notice" hidden></div>
-			<div class="driver-workspace">
-				<section class="form-panel driver-login-panel" aria-labelledby="driver-login-title">
-					<p class="eyebrow">ACCESO DE CONDUCTOR</p>
-					<h2 id="driver-login-title">Iniciar sesión</h2>
-					<p class="panel-copy">Ingresa con tu cuenta o regístrate para comenzar a recibir pedidos.</p>
-					<form id="driver-login-form">
-						<label class="field-label" for="driver-email">Correo</label>
-						<input id="driver-email" type="email" autocomplete="username" required>
-						<label class="field-label" for="driver-password">Contraseña</label>
-						<input id="driver-password" type="password" autocomplete="current-password" required>
-						<button class="primary-button driver-login-button" type="submit">Entrar</button>
-						<p id="driver-login-feedback" class="form-feedback" role="status" aria-live="polite"></p>
-					</form>
-					<button id="open-driver-registration" class="secondary-button driver-login-button" type="button">Registrarme como conductor</button>
-					<div id="driver-session" hidden>
-						<p id="driver-session-name" class="driver-session-name"></p>
-						<p id="driver-session-vehicle" class="driver-session-vehicle"></p>
-						<p id="driver-registration-status" class="form-feedback" role="status" aria-live="polite"></p>
-						<button id="continue-driver-registration" class="secondary-button driver-login-button" type="button" hidden>Completar registro</button>
-						<button id="driver-logout" class="secondary-button driver-login-button" type="button">Cerrar sesión</button>
-					</div>
-				</section>
-				<div class="driver-order-lists">
-					<section class="inventory-panel driver-orders-panel" aria-labelledby="available-orders-title">
-						<div class="section-heading driver-orders-heading">
-							<div><p class="eyebrow">DISPONIBLES PARA ACEPTAR</p><h2 id="available-orders-title">Pedidos nuevos</h2></div>
-							<button id="refresh-driver-orders" class="secondary-button refresh-orders-button" type="button">Actualizar</button>
-						</div>
-						<div id="available-orders" class="driver-order-list"></div>
-						<p id="available-orders-empty" class="empty-state driver-empty-state">Inicia sesión para buscar pedidos.</p>
-					</section>
-					<section class="inventory-panel driver-orders-panel" aria-labelledby="my-orders-title">
-						<div class="section-heading driver-orders-heading">
-							<div><p class="eyebrow">TUS ENTREGAS</p><h2 id="my-orders-title">Pedidos aceptados</h2></div>
-						</div>
-						<div id="my-driver-orders" class="driver-order-list"></div>
-						<p id="my-orders-empty" class="empty-state driver-empty-state">Todavía no tienes entregas activas.</p>
-					</section>
-				</div>
-			</div>
-		</section>
-
-		<dialog id="driver-registration-dialog" class="driver-registration-dialog" aria-labelledby="driver-registration-title">
-			<form id="driver-registration-form" enctype="multipart/form-data">
-				<div class="dialog-heading">
-					<div>
-						<p class="eyebrow">REGISTRO SEGURO DE CONDUCTOR</p>
-						<h2 id="driver-registration-title">Tu perfil de reparto</h2>
-					</div>
-					<button id="close-driver-registration" class="dialog-close" type="button" aria-label="Cerrar registro">×</button>
-				</div>
-				<p class="dialog-copy">Completa tus datos y adjunta documentos vigentes. El acceso a pedidos se habilita al completar la carga.</p>
-				<fieldset class="driver-registration-section">
-					<legend>Identidad y contacto</legend>
-					<div class="driver-registration-grid">
-						<div><label class="field-label" for="registration-full-name">Nombre y apellido</label><input id="registration-full-name" type="text" maxlength="100" autocomplete="name" required></div>
-						<div><label class="field-label" for="registration-national-id">Cédula de identidad</label><input id="registration-national-id" type="text" maxlength="24" autocomplete="off" placeholder="V-12345678" required></div>
-						<div><label class="field-label" for="registration-birth-date">Fecha de nacimiento</label><input id="registration-birth-date" type="date" autocomplete="bday" required></div>
-						<div><label class="field-label" for="registration-phone">Teléfono móvil</label><input id="registration-phone" type="tel" maxlength="30" autocomplete="tel" required></div>
-						<div id="registration-account-fields" class="driver-registration-full">
-							<label class="field-label" for="registration-email">Correo electrónico</label>
-							<input id="registration-email" type="email" maxlength="254" autocomplete="email" required>
-							<label class="field-label" for="registration-password">Contraseña (mínimo 12 caracteres)</label>
-							<input id="registration-password" type="password" minlength="12" autocomplete="new-password" required>
-						</div>
-					</div>
-				</fieldset>
-				<fieldset class="driver-registration-section">
-					<legend>Licencia de conducir</legend>
-					<div class="driver-registration-grid">
-						<div><label class="field-label" for="registration-license-number">Número de licencia</label><input id="registration-license-number" type="text" maxlength="40" autocomplete="off" required></div>
-						<div><label class="field-label" for="registration-license-class">Grado / clase</label><input id="registration-license-class" type="text" maxlength="40" placeholder="Ej. 3er grado" required></div>
-						<div><label class="field-label" for="registration-license-expiry">Vencimiento de licencia</label><input id="registration-license-expiry" type="date" required></div>
-					</div>
-				</fieldset>
-				<fieldset class="driver-registration-section">
-					<legend>Vehículo y cobertura</legend>
-					<div class="driver-registration-grid">
-						<div><label class="field-label" for="registration-plate">Placa</label><input id="registration-plate" type="text" maxlength="20" autocomplete="off" required></div>
-						<div><label class="field-label" for="registration-vehicle-make">Marca</label><input id="registration-vehicle-make" type="text" maxlength="50" required></div>
-						<div><label class="field-label" for="registration-vehicle-model">Modelo</label><input id="registration-vehicle-model" type="text" maxlength="50" required></div>
-						<div><label class="field-label" for="registration-vehicle-year">Año</label><input id="registration-vehicle-year" type="number" min="1980" max="2100" step="1" required></div>
-						<div><label class="field-label" for="registration-vehicle-color">Color</label><input id="registration-vehicle-color" type="text" maxlength="40" required></div>
-						<div><label class="field-label" for="registration-vehicle-registration">N.º de registro del vehículo</label><input id="registration-vehicle-registration" type="text" maxlength="60" required></div>
-						<div><label class="field-label" for="registration-insurance-company">Aseguradora</label><input id="registration-insurance-company" type="text" maxlength="100" required></div>
-						<div><label class="field-label" for="registration-insurance-policy">N.º de póliza</label><input id="registration-insurance-policy" type="text" maxlength="60" required></div>
-						<div><label class="field-label" for="registration-insurance-expiry">Vencimiento del seguro</label><input id="registration-insurance-expiry" type="date" required></div>
-					</div>
-				</fieldset>
-				<fieldset class="driver-registration-section">
-					<legend>Contacto de emergencia</legend>
-					<div class="driver-registration-grid">
-						<div><label class="field-label" for="registration-emergency-name">Nombre y apellido</label><input id="registration-emergency-name" type="text" maxlength="100" required></div>
-						<div><label class="field-label" for="registration-emergency-phone">Teléfono</label><input id="registration-emergency-phone" type="tel" maxlength="30" required></div>
-					</div>
-				</fieldset>
-				<fieldset class="driver-registration-section">
-					<legend>Documentos obligatorios</legend>
-					<p class="driver-document-notice">Sube imágenes claras o PDF (máximo 8 MB cada uno). Los documentos se guardan en un espacio privado de Supabase; no se muestran a clientes ni a otros conductores.</p>
-					<div class="driver-document-grid">
-						<div><label class="field-label" for="registration-document-id">Cédula (anverso y reverso en un archivo)</label><input id="registration-document-id" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
-						<div><label class="field-label" for="registration-document-license">Licencia de conducir</label><input id="registration-document-license" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
-						<div><label class="field-label" for="registration-document-vehicle">Registro / propiedad del vehículo</label><input id="registration-document-vehicle" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
-						<div><label class="field-label" for="registration-document-insurance">Póliza o constancia de seguro vigente</label><input id="registration-document-insurance" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
-					</div>
-				</fieldset>
-				<fieldset class="driver-registration-section driver-consent">
-					<legend>Confirmación</legend>
-					<label><input id="registration-consent" type="checkbox" required> Confirmo que soy mayor de 18 años, los datos son verdaderos y autorizo a la tienda a verificar y conservar esta información y documentación para habilitar y gestionar los repartos.</label>
-				</fieldset>
-				<p class="driver-registration-security">No envíes estos documentos por chat. Se guardan en un espacio privado y no se conservan en el navegador. El acceso se habilita automáticamente al cargar los cuatro archivos; el sistema no puede comprobar por sí solo que sean auténticos, así que la tienda debe revisarlos antes de asignar repartos reales.</p>
-				<p id="driver-registration-feedback" class="form-feedback" role="status" aria-live="polite"></p>
-				<div class="dialog-actions driver-registration-actions">
-					<button class="secondary-button" type="button" id="cancel-driver-registration">Cancelar</button>
-					<button class="primary-button" type="submit">Crear cuenta y enviar documentos</button>
-				</div>
-			</form>
-		</dialog>
-
 		<section id="admin-view" class="app-view" aria-labelledby="admin-title" hidden>
 			<section class="intro admin-intro">
 				<div>
@@ -287,39 +129,6 @@
 					<h1 id="admin-title">Inventario,<br><span>bajo control.</span></h1>
 				</div>
 				<p class="intro-copy">Administra productos, cantidades disponibles y artículos agotados.</p>
-			</section>
-
-			<section class="supabase-setup-panel" aria-labelledby="supabase-setup-title">
-				<div class="section-heading supabase-setup-heading">
-					<div>
-						<p class="eyebrow">CONEXIÓN DE LA TIENDA</p>
-						<h2 id="supabase-setup-title">Configurar pedidos y conductores</h2>
-					</div>
-					<span id="supabase-setup-status" class="setup-status">Sin configurar</span>
-				</div>
-				<p class="panel-copy">Conecta este programa a tu proyecto Supabase con la URL y la clave pública del proyecto. La clave se guarda solo en este navegador; nunca pegues aquí una clave secreta o service_role.</p>
-				<ol class="supabase-setup-steps">
-					<li>Crea un proyecto desde <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">Supabase Dashboard</a>.</li>
-					<li>En Project Settings → API, copia la URL del proyecto y su clave pública anon/publishable.</li>
-					<li>Abre <a href="./SUPABASE_SETUP.sql" target="_blank" rel="noreferrer">SUPABASE_SETUP.sql</a> y ejecútalo una vez en SQL Editor. Esto crea tablas, reglas privadas y el almacenamiento seguro de documentos.</li>
-					<li>Guarda y verifica la conexión aquí. Después, los registros, documentos privados y pedidos se gestionan desde este programa. El inventario de productos sigue guardándose en este navegador.</li>
-				</ol>
-				<form id="supabase-setup-form" class="supabase-setup-form">
-					<div>
-						<label class="field-label" for="supabase-project-url">URL del proyecto</label>
-						<input id="supabase-project-url" type="url" inputmode="url" autocomplete="url" placeholder="https://tu-proyecto.supabase.co" required>
-					</div>
-					<div>
-						<label class="field-label" for="supabase-public-key">Clave pública anon / publishable</label>
-						<input id="supabase-public-key" type="password" autocomplete="off" spellcheck="false" placeholder="sb_publishable_… o clave anon pública" required>
-					</div>
-					<div class="supabase-setup-actions">
-						<button id="supabase-setup-save" class="primary-button" type="submit">Verificar y guardar conexión</button>
-						<button id="supabase-setup-clear" class="secondary-button" type="button">Desconectar</button>
-					</div>
-					<p id="supabase-setup-feedback" class="form-feedback supabase-setup-feedback" role="status" aria-live="polite"></p>
-				</form>
-				<p class="supabase-setup-security">La clave pública se guarda en el almacenamiento local de este navegador. No se incluye en el repositorio ni se envía a otro servicio. La contraseña de conductor y los documentos personales se procesan directamente con Supabase.</p>
 			</section>
 
 			<section class="stats" aria-label="Resumen del inventario">
