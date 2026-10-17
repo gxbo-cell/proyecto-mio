@@ -5,8 +5,8 @@ const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v1";
 const RATE_ENDPOINT = "https://ve.dolarapi.com/v1/dolares/oficial";
 const DELIVERY_STORAGE_KEY = "la-tiendita-latest-delivery-v1";
 const DRIVER_SESSION_KEY = "la-tiendita-driver-session-v1";
-const SUPABASE_URL = "";
-const SUPABASE_ANON_KEY = "";
+const SUPABASE_CONFIG_KEY = "la-tiendita-supabase-config-v1";
+let supabaseConfig = loadSupabaseConfig();
 const DELIVERY_ORIGIN = { latitude: 10.4806, longitude: -66.9036 };
 const DELIVERY_ZONE_KM = 5;
 const DELIVERY_ZONE_PRICE = 1;
@@ -93,6 +93,13 @@ const continueDriverRegistrationButton = document.querySelector("#continue-drive
 const registrationAccountFields = document.querySelector("#registration-account-fields");
 const registrationEmailInput = document.querySelector("#registration-email");
 const registrationPasswordInput = document.querySelector("#registration-password");
+const supabaseSetupForm = document.querySelector("#supabase-setup-form");
+const supabaseSetupUrlInput = document.querySelector("#supabase-project-url");
+const supabaseSetupKeyInput = document.querySelector("#supabase-public-key");
+const supabaseSetupFeedback = document.querySelector("#supabase-setup-feedback");
+const supabaseSetupStatus = document.querySelector("#supabase-setup-status");
+const supabaseSetupSaveButton = document.querySelector("#supabase-setup-save");
+const supabaseSetupClearButton = document.querySelector("#supabase-setup-clear");
 const availableOrders = document.querySelector("#available-orders");
 const myDriverOrders = document.querySelector("#my-driver-orders");
 const availableOrdersEmpty = document.querySelector("#available-orders-empty");
@@ -163,8 +170,19 @@ function loadDriverSession() {
 	}
 }
 
+function loadSupabaseConfig() {
+	try {
+		const config = JSON.parse(localStorage.getItem(SUPABASE_CONFIG_KEY) || "null");
+		return config && typeof config.url === "string" && typeof config.anonKey === "string"
+			? config
+			: { url: "", anonKey: "" };
+	} catch {
+		return { url: "", anonKey: "" };
+	}
+}
+
 function isSupabaseConfigured() {
-	return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+	return Boolean(supabaseConfig.url && supabaseConfig.anonKey);
 }
 
 async function supabaseRequest(path, { method = "GET", body, token } = {}) {
@@ -172,13 +190,13 @@ async function supabaseRequest(path, { method = "GET", body, token } = {}) {
 		throw new Error("Falta configurar la URL del proyecto y la clave pública de Supabase en FUNCIONAMIENTO.JS.");
 	}
 	const headers = {
-		apikey: SUPABASE_ANON_KEY,
-		Authorization: "Bearer " + (token || SUPABASE_ANON_KEY)
+		apikey: supabaseConfig.anonKey,
+		Authorization: "Bearer " + (token || supabaseConfig.anonKey)
 	};
 	if (body !== undefined) {
 		headers["Content-Type"] = "application/json";
 	}
-	const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}${path}`, {
+	const response = await fetch(`${supabaseConfig.url.replace(/\/$/, "")}${path}`, {
 		method,
 		headers,
 		body: body === undefined ? undefined : JSON.stringify(body)
