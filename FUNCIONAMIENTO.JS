@@ -903,7 +903,11 @@ function getCoordinatesFromMapLink(mapLink) {
 	for (const pattern of patterns) {
 		const match = mapLink.match(pattern);
 		if (match) {
-			return { latitude: Number(match[1]), longitude: Number(match[2]) };
+			const latitude = Number(match[1]);
+			const longitude = Number(match[2]);
+			if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+				return { latitude, longitude };
+			}
 		}
 	}
 	return null;
@@ -1275,6 +1279,8 @@ async function renderLatestDeliveryTracking() {
 	const trackingPanel = document.querySelector("#delivery-tracking");
 	if (!latestDelivery) {
 		trackingPanel.hidden = true;
+		window.clearInterval(trackingTimer);
+		trackingTimer = null;
 		return;
 	}
 	trackingPanel.hidden = false;
@@ -1296,7 +1302,10 @@ async function renderLatestDeliveryTracking() {
 		document.querySelector("#tracking-headline").textContent = "Revisa el código privado de seguimiento.";
 		return;
 	}
-	if (!trackingTimer) {
+	if (["delivered", "cancelled"].includes(tracking.status)) {
+		window.clearInterval(trackingTimer);
+		trackingTimer = null;
+	} else if (!trackingTimer) {
 		trackingTimer = window.setInterval(() => {
 			if (latestDelivery) {
 				void renderLatestDeliveryTracking();
@@ -1411,12 +1420,14 @@ async function refreshDriverOrders() {
 			callSupabaseFunction("list_available_delivery_orders", {}, driverSession.access_token),
 			callSupabaseFunction("list_my_delivery_orders", {}, driverSession.access_token)
 		]);
-		availableOrders.replaceChildren(...(pending || []).map((order) => renderDriverOrderCard(order, true)));
-		myDriverOrders.replaceChildren(...(active || []).map((order) => renderDriverOrderCard(order, false)));
-		availableOrdersEmpty.hidden = pending.length > 0;
-		availableOrdersEmpty.textContent = pending.length > 0 ? "" : "No hay pedidos nuevos por aceptar.";
-		myOrdersEmpty.hidden = active.length > 0;
-		myOrdersEmpty.textContent = active.length > 0 ? "" : "Todavía no tienes entregas activas.";
+		const pendingOrders = Array.isArray(pending) ? pending : [];
+		const activeOrders = Array.isArray(active) ? active : [];
+		availableOrders.replaceChildren(...pendingOrders.map((order) => renderDriverOrderCard(order, true)));
+		myDriverOrders.replaceChildren(...activeOrders.map((order) => renderDriverOrderCard(order, false)));
+		availableOrdersEmpty.hidden = pendingOrders.length > 0;
+		availableOrdersEmpty.textContent = pendingOrders.length > 0 ? "" : "No hay pedidos nuevos por aceptar.";
+		myOrdersEmpty.hidden = activeOrders.length > 0;
+		myOrdersEmpty.textContent = activeOrders.length > 0 ? "" : "Todavía no tienes entregas activas.";
 		driverLoginFeedback.textContent = "";
 	} catch (error) {
 		driverLoginFeedback.textContent = `No se pudieron actualizar los pedidos: ${error.message}`;
@@ -1718,6 +1729,8 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 driverLoginForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	driverLoginFeedback.textContent = "Verificando la cuenta de conductor...";
+	const loginButton = driverLoginForm.querySelector('button[type="submit"]');
+	loginButton.disabled = true;
 	try {
 		await signInDriver(
 			document.querySelector("#driver-email").value.trim(),
@@ -1727,6 +1740,8 @@ driverLoginForm.addEventListener("submit", async (event) => {
 		renderDriverSession();
 	} catch (error) {
 		driverLoginFeedback.textContent = `No se pudo iniciar sesión: ${error.message}`;
+	} finally {
+		loginButton.disabled = false;
 	}
 });
 document.querySelector("#driver-logout").addEventListener("click", () => {
