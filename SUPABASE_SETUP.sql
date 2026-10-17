@@ -1,6 +1,8 @@
 -- Run this script in the Supabase SQL Editor for the La Tiendita project.
--- To create a driver: first create their Auth user in Authentication, then
--- insert their Auth user id and verified vehicle details into public.drivers.
+-- To authorize a driver, create their Auth user in Authentication, then add
+-- that user's id and verified vehicle details to public.drivers:
+-- insert into public.drivers (user_id, full_name, phone, plate_number, vehicle_make, vehicle_model, vehicle_year)
+-- values ('AUTH_USER_UUID', 'Nombre del conductor', '0412-000-0000', 'ABC123', 'Toyota', 'Corolla', 2022);
 
 create extension if not exists pgcrypto with schema extensions;
 
@@ -87,6 +89,7 @@ set search_path = public, extensions, pg_temp
 as $$
 declare
 	new_order_id uuid;
+	items_subtotal numeric(12, 2);
 begin
 	if p_tracking_code is null
 		or length(trim(coalesce(p_customer_name, ''))) not between 2 and 100
@@ -100,6 +103,26 @@ begin
 		or p_delivery_longitude not between -180 and 180
 		or p_payment_method not in ('Efectivo', 'Pago móvil', 'Transferencia') then
 		raise exception 'Los datos del pedido no son válidos.';
+	end if;
+
+	if exists (
+		select 1
+		from jsonb_to_recordset(p_items) as item(name text, quantity numeric, unit text, price_per_unit numeric, line_total numeric)
+		where length(trim(coalesce(item.name, ''))) not between 1 and 100
+			or item.quantity is null or item.quantity <= 0
+			or item.unit not in ('kg', 'unidad')
+			or item.price_per_unit is null or item.price_per_unit <= 0
+			or item.line_total is null or item.line_total < 0
+	) then
+		raise exception 'Los productos incluidos en el pedido no son válidos.';
+	end if;
+
+	select round(coalesce(sum(item.line_total), 0), 2)
+	into items_subtotal
+	from jsonb_to_recordset(p_items) as item(line_total numeric);
+
+	if items_subtotal <> p_subtotal then
+		raise exception 'El subtotal no coincide con el detalle del pedido.';
 	end if;
 
 	insert into public.delivery_orders (
