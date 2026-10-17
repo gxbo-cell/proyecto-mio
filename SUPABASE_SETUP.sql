@@ -90,6 +90,15 @@ create policy "Drivers upload their own private documents"
 		and (storage.foldername(name))[2] in ('identity', 'license', 'vehicle_registration', 'insurance')
 	);
 
+drop policy if exists "Drivers view their own private documents" on storage.objects;
+create policy "Drivers view their own private documents"
+	on storage.objects for select to authenticated
+	using (
+		bucket_id = 'driver-documents'
+		and public.can_manage_my_driver_documents()
+		and (storage.foldername(name))[1] = auth.uid()::text
+	);
+
 drop policy if exists "Drivers replace their own private documents" on storage.objects;
 create policy "Drivers replace their own private documents"
 	on storage.objects for update to authenticated
