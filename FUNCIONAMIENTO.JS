@@ -1482,8 +1482,13 @@ function renderDriverSession() {
 	const driver = driverSession?.driver;
 	driverLoginForm.hidden = signedIn;
 	driverSessionPanel.hidden = !signedIn;
-	openDriverRegistrationButton.hidden = signedIn || !isSupabaseConfigured();
-	continueDriverRegistrationButton.hidden = !signedIn || Boolean(driver) || !isSupabaseConfigured();
+	openDriverRegistrationButton.hidden = signedIn;
+	openDriverRegistrationButton.disabled = !isSupabaseConfigured();
+	openDriverRegistrationButton.textContent = isSupabaseConfigured()
+		? "Registrarme como conductor"
+		: "Registro requiere Supabase";
+	continueDriverRegistrationButton.hidden = !signedIn || Boolean(driver);
+	continueDriverRegistrationButton.disabled = !isSupabaseConfigured();
 	document.querySelector("#driver-setup-notice").hidden = isSupabaseConfigured();
 	if (!isSupabaseConfigured()) {
 		document.querySelector("#driver-setup-notice").textContent = "Para habilitar pedidos entre dispositivos, crea un proyecto Supabase, ejecuta SUPABASE_SETUP.sql y configura su URL y clave pública en FUNCIONAMIENTO.JS.";
