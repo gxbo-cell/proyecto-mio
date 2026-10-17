@@ -1863,9 +1863,17 @@ document.querySelector("#admin-date").textContent = new Intl.DateTimeFormat("es"
 	month: "long",
 	year: "numeric"
 }).format(new Date()).toLocaleUpperCase("es");
+document.querySelector("#driver-date").textContent = new Intl.DateTimeFormat("es", {
+	day: "numeric",
+	month: "long",
+	year: "numeric"
+}).format(new Date()).toLocaleUpperCase("es");
+if (latestDelivery) {
+	void renderLatestDeliveryTracking();
+}
 
 renderProducts();
 renderCart();
 configureProductFormMode();
+renderDriverSession();
 loadDailyRate();
-renderLatestDeliveryTracking();
