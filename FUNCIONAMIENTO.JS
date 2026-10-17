@@ -1194,51 +1194,142 @@ function useCurrentLocation() {
 	}, { enableHighAccuracy: true, timeout: 10000 });
 }
 
-function renderLatestDeliveryTracking() {
+function getOrderItemsSnapshot() {
+	return cart.map((item) => {
+		const product = products.find((entry) => entry.id === item.productId);
+		if (!product) {
+			throw new Error("Un producto del carrito ya no está disponible.");
+		}
+		const weightProduct = isWeightProduct(product);
+		const lineTotal = getCartLineTotal(product, item.quantity);
+		return {
+			name: product.name,
+			category: product.category,
+			quantity: weightProduct ? item.quantity / GRAMS_PER_KILOGRAM : item.quantity,
+			unit: weightProduct ? "kg" : "unidad",
+			price_per_unit: product.price,
+			line_total: Number(lineTotal.toFixed(2))
+		};
+	});
+}
+
+async function createSharedDeliveryOrder(paymentMethod) {
+	const trackingCode = crypto.randomUUID();
+	if (!deliveryCoordinates) {
+		throw new Error("Selecciona nuevamente la ubicación de entrega.");
+	}
+	const result = await callSupabaseFunction("create_delivery_order", {
+		p_tracking_code: trackingCode,
+		p_customer_name: deliveryCustomerName.value.trim(),
+		p_customer_phone: deliveryCustomerPhone.value.trim(),
+		p_items: getOrderItemsSnapshot(),
+		p_subtotal: Number(getCartTotal().toFixed(2)),
+		p_delivery_fee: Number(deliveryFee.toFixed(2)),
+		p_delivery_address: getDeliveryLocation(),
+		p_delivery_latitude: deliveryCoordinates.latitude,
+		p_delivery_longitude: deliveryCoordinates.longitude,
+		p_payment_method: paymentMethod
+	});
+	if (typeof result !== "string") {
+		throw new Error("Supabase no confirmó la creación del pedido.");
+	}
+	latestDelivery = {
+		id: result,
+		trackingCode,
+		location: getDeliveryLocation(),
+		status: "pending"
+	};
+	try {
+		localStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(latestDelivery));
+	} catch {
+		throw new Error(`El pedido fue enviado, pero el navegador no guardó el código. Anótalo: ${trackingCode}`);
+	}
+	return trackingCode;
+}
+
+async function renderLatestDeliveryTracking() {
 	const trackingPanel = document.querySelector("#delivery-tracking");
 	if (!latestDelivery) {
 		trackingPanel.hidden = true;
 		return;
 	}
 	trackingPanel.hidden = false;
-	document.querySelector("#tracking-driver").textContent = `Conductor: ${latestDelivery.driver} · ${latestDelivery.location}`;
-	const labels = ["Recogió el pedido", "Pedido en camino", "Pedido entregado"];
-	const headlines = ["El conductor recogió tu pedido.", "¡Tu delivery ya está en camino!", "Tu pedido fue entregado."];
-	document.querySelector("#tracking-headline").textContent = latestDelivery.status < 0
-		? "Tu pedido está siendo preparado."
-		: headlines[latestDelivery.status];
-	document.querySelector("#tracking-status-badge").textContent = latestDelivery.status < 0
-		? "Preparando"
-		: labels[latestDelivery.status];
-	document.querySelector("#tracking-progress-fill").style.width = `${Math.max(0, (latestDelivery.status + 1) / 3 * 100)}%`;
-	document.querySelectorAll(".tracking-step").forEach((button) => {
-		const step = Number(button.dataset.deliveryStep);
-		button.classList.toggle("is-complete", step < latestDelivery.status);
-		button.classList.toggle("is-current", step === latestDelivery.status);
-		button.disabled = step > latestDelivery.status + 1 || step <= latestDelivery.status;
-	});
-}
-
-function advanceDeliveryStatus(step) {
-	if (!latestDelivery || step !== latestDelivery.status + 1 || step > 2) {
+	document.querySelector("#tracking-driver").textContent = latestDelivery.location || "";
+	document.querySelector("#tracking-code").textContent = `Código privado de seguimiento: ${latestDelivery.trackingCode}`;
+	const driverDetails = document.querySelector("#tracking-driver-details");
+	driverDetails.replaceChildren();
+	let tracking;
+	try {
+		tracking = await callSupabaseFunction("get_delivery_tracking", {
+			p_tracking_code: latestDelivery.trackingCode
+		});
+	} catch (error) {
+		document.querySelector("#tracking-headline").textContent = `No se pudo actualizar el seguimiento: ${error.message}`;
 		return;
 	}
-	latestDelivery.status = step;
+	if (!tracking) {
+		document.querySelector("#tracking-status-badge").textContent = "Pedido no encontrado";
+		document.querySelector("#tracking-headline").textContent = "Revisa el código privado de seguimiento.";
+		return;
+	}
+	latestDelivery.status = tracking.status;
 	try {
 		localStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(latestDelivery));
 	} catch {
-		return;
+		document.querySelector("#tracking-headline").textContent = "El seguimiento está disponible, pero no se pudo guardar en este navegador.";
 	}
-	renderLatestDeliveryTracking();
+	const states = {
+		pending: { label: "Buscando conductor", headline: "Tu pedido está disponible para que un conductor lo acepte.", progress: 0 },
+		accepted: { label: "Conductor asignado", headline: "Un conductor aceptó el pedido y va a prepararlo.", progress: 25 },
+		picked_up: { label: "Pedido recogido", headline: "El conductor recogió tu pedido.", progress: 55 },
+		on_the_way: { label: "En camino", headline: "¡Tu pedido ya está en camino!", progress: 80 },
+		delivered: { label: "Entregado", headline: "Tu pedido fue entregado.", progress: 100 },
+		cancelled: { label: "Cancelado", headline: "Este pedido fue cancelado.", progress: 0 }
+	};
+	const state = states[tracking.status] || states.pending;
+	document.querySelector("#tracking-headline").textContent = state.headline;
+	document.querySelector("#tracking-status-badge").textContent = state.label;
+	document.querySelector("#tracking-progress-fill").style.width = `${state.progress}%`;
+	const driver = tracking.driver;
+	driverDetails.hidden = !driver;
+	if (driver) {
+		const name = document.createElement("strong");
+		name.textContent = driver.full_name;
+		const vehicle = document.createElement("p");
+		vehicle.textContent = `${driver.vehicle_make} ${driver.vehicle_model} · ${driver.vehicle_year} · Placa ${driver.plate_number}`;
+		const phone = document.createElement("a");
+		phone.href = `tel:${driver.phone.replace(/[^\d+]/g, "")}`;
+		phone.textContent = `Llamar al conductor · ${driver.phone}`;
+		driverDetails.append(name, vehicle, phone);
+	}
+	const milestoneStatuses = ["picked_up", "on_the_way", "delivered"];
+	document.querySelectorAll(".tracking-steps li").forEach((step, index) => {
+		const complete = milestoneStatuses.indexOf(tracking.status) >= index;
+		step.classList.toggle("is-complete", complete);
+		step.classList.toggle("is-current", milestoneStatuses[index] === tracking.status);
+	});
 }
 
-function completePurchase(paymentMethod) {
+async function completePurchase(paymentMethod) {
 	const unavailable = cart.some((item) => {
 		const product = products.find((entry) => entry.id === item.productId);
 		return !product || item.quantity > product.stock;
 	});
 	if (unavailable) {
 		checkoutFeedback.textContent = "El stock cambió. Revisa el carrito e inténtalo de nuevo.";
+		return;
+	}
+
+	checkoutFeedback.textContent = "";
+	const confirmButton = document.querySelector("#confirm-payment");
+	confirmButton.disabled = true;
+	try {
+		if (deliveryToggle.checked) {
+			await createSharedDeliveryOrder(paymentMethod);
+		}
+	} catch (error) {
+		checkoutFeedback.textContent = `No se pudo enviar el pedido: ${error.message}`;
+		confirmButton.disabled = false;
 		return;
 	}
 
@@ -1255,16 +1346,9 @@ function completePurchase(paymentMethod) {
 	purchaseTotal.textContent = formatMoney(total);
 	document.querySelector("#purchase-total-bs").textContent = formatBolivars(total);
 	document.querySelector("#purchase-delivery").textContent = deliveryLocation
-		? `Delivery · ${deliveryLocation} · Conductor: ${deliveryDriver.value.trim()} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
+		? `Delivery · ${deliveryLocation} · Buscando conductor · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
 		: "Retiro en tienda";
-	if (deliveryLocation) {
-		latestDelivery = { location: deliveryLocation, driver: deliveryDriver.value.trim(), fee: deliveryFee, status: -1 };
-		try {
-			localStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(latestDelivery));
-		} catch {
-			showFeedback("No se pudo guardar el seguimiento del delivery.", true);
-		}
-	} else {
+	if (!deliveryLocation) {
 		latestDelivery = null;
 		localStorage.removeItem(DELIVERY_STORAGE_KEY);
 	}
@@ -1293,8 +1377,11 @@ function completePurchase(paymentMethod) {
 	if (paymentDetailsDialog.open) {
 		paymentDetailsDialog.close();
 	}
+	confirmButton.disabled = false;
 	checkoutDialog.close();
-	showFeedback("Compra confirmada.");
+	showFeedback(deliveryLocation
+		? "Pedido enviado. Esperando que un conductor lo acepte."
+		: "Compra confirmada.");
 	renderCart();
 	renderProducts();
 	renderLatestDeliveryTracking();
