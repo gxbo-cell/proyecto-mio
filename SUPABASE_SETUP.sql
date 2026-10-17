@@ -592,6 +592,25 @@ as $$
 	where o.tracking_code = p_tracking_code;
 $$;
 
+create or replace function public.check_store_setup()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+	select jsonb_build_object(
+		'ready',
+		to_regclass('public.drivers') is not null
+		and to_regclass('public.delivery_orders') is not null
+		and to_regclass('public.driver_documents') is not null
+		and exists (
+			select 1 from storage.buckets
+			where id = 'driver-documents' and not public
+		)
+	);
+$$;
+
 revoke all on function public.create_delivery_order(uuid, text, text, jsonb, numeric, numeric, text, double precision, double precision, text) from public;
 revoke all on function public.list_available_delivery_orders() from public;
 revoke all on function public.list_my_delivery_orders() from public;
@@ -603,6 +622,7 @@ revoke all on function public.register_my_driver_profile(text, text, text, date,
 revoke all on function public.record_my_driver_document(text, text) from public;
 revoke all on function public.activate_my_driver_profile() from public;
 revoke all on function public.can_manage_my_driver_documents() from public;
+revoke all on function public.check_store_setup() from public;
 
 grant execute on function public.create_delivery_order(uuid, text, text, jsonb, numeric, numeric, text, double precision, double precision, text) to anon, authenticated;
 grant execute on function public.list_available_delivery_orders() to authenticated;
@@ -615,3 +635,4 @@ grant execute on function public.register_my_driver_profile(text, text, text, da
 grant execute on function public.record_my_driver_document(text, text) to authenticated;
 grant execute on function public.activate_my_driver_profile() to authenticated;
 grant execute on function public.can_manage_my_driver_documents() to authenticated;
+grant execute on function public.check_store_setup() to anon, authenticated;
