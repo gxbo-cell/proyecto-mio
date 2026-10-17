@@ -174,7 +174,6 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .cart-delivery-line { margin: 12px 0 -4px; color: var(--muted); font-size: 10px; text-align: right; }
 .checkout-button:disabled { cursor: not-allowed; background: #b7bcb4; }
 
-.driver-field { margin-top: 13px; }
 .delivery-estimate { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 11px 12px; border: 1px solid #dce7dc; border-radius: 4px; background: #f1f6f0; }
 .delivery-estimate > div { display: grid; gap: 3px; }
 .delivery-estimate .eyebrow { margin: 0; color: var(--green); font-size: 8px; }
@@ -203,31 +202,6 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .map-feedback { margin: 7px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
 .delivery-note { margin: 6px 0 0; color: var(--muted); font-size: 9px; }
 .delivery-feedback:empty { display: none; }
-.driver-field { margin-top: 13px; }
-.delivery-estimate { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 11px 12px; border: 1px solid #dce7dc; border-radius: 4px; background: #f1f6f0; }
-.delivery-estimate > div { display: grid; gap: 3px; }
-.delivery-estimate .eyebrow { margin: 0; color: var(--green); font-size: 8px; }
-.delivery-estimate > div > strong { color: var(--green-dark); font-size: 17px; }
-.delivery-estimate small { color: var(--muted); font-size: 9px; }
-.delivery-fee-bs { color: #66735f; font-size: 10px; text-align: right; }
-
-.tracking-panel { padding: 19px 20px; border: 1px solid #dce7dc; border-radius: 5px; background: linear-gradient(145deg, #f5f8f2, #fffefa 72%); }
-.tracking-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.tracking-header .eyebrow { margin-bottom: 4px; color: var(--green); }
-.tracking-header h2 { font-size: 22px; }
-.tracking-status-badge { max-width: 120px; padding: 6px 9px; border-radius: 20px; color: var(--green); background: #e8f0e7; font-size: 9px; font-weight: 700; text-align: center; }
-.tracking-headline { margin: 12px 0 5px; color: var(--ink); font-size: 12px; font-weight: 600; }
-.tracking-driver { margin: 0 0 17px; color: var(--muted); font-size: 10px; }
-.tracking-progress { height: 4px; margin: 0 11px; overflow: hidden; border-radius: 9px; background: #e3e7df; }
-.tracking-progress span { width: 0; height: 100%; display: block; border-radius: inherit; background: var(--green); transition: width .25s ease; }
-.tracking-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 0; padding: 0; list-style: none; }
-.tracking-steps li { min-width: 0; }
-.tracking-step { width: 100%; display: grid; justify-items: center; gap: 7px; padding: 0 2px; border: 0; color: #85877f; background: transparent; cursor: pointer; }
-.tracking-step:disabled { cursor: default; }
-.tracking-step-marker { width: 25px; height: 25px; display: grid; place-items: center; margin-top: -15px; border: 2px solid #dfe4dc; border-radius: 50%; color: #7f837b; background: #fffefa; font-size: 9px; font-weight: 700; }
-.tracking-step-label { max-width: 100%; font-size: 8px; line-height: 1.4; text-align: center; }
-.tracking-step.is-complete .tracking-step-marker, .tracking-step.is-current .tracking-step-marker { border-color: var(--green); color: #fff; background: var(--green); }
-.tracking-step.is-complete .tracking-step-label, .tracking-step.is-current .tracking-step-label { color: var(--green-dark); font-weight: 700; }
 
 .checkout-dialog { width: min(430px, calc(100% - 32px)); max-width: none; padding: 25px; border: 1px solid #e7e4db; border-radius: 6px; color: var(--ink); background: var(--paper); box-shadow: 0 18px 60px rgba(27, 34, 28, .2); }
 .checkout-dialog::backdrop { background: rgba(28, 35, 30, .48); backdrop-filter: blur(2px); }
