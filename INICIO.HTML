@@ -19,101 +19,53 @@
 			<span class="brand-mark" aria-hidden="true">LT</span>
 			<span>la tiendita<span class="brand-period">.</span></span>
 		</a>
-		<span class="topbar-note"><span class="live-dot"></span> Panel de inventario</span>
+		<nav class="view-switch" aria-label="Secciones de la tienda">
+			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true">Compras</button>
+			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Administración</button>
+		</nav>
 	</header>
 
 	<main id="inicio" class="page-shell">
-		<section class="intro" aria-labelledby="page-title">
+		<section id="shopping-view" class="app-view" aria-labelledby="page-title">
+			<section class="intro" aria-labelledby="page-title">
 			<div>
-				<p class="eyebrow">CONTROL DE TIENDA <span>·</span> <span id="today-date"></span></p>
-				<h1 id="page-title">Tu inventario,<br><span>bajo control.</span></h1>
+				<p class="eyebrow">LA TIENDITA <span>·</span> <span id="today-date"></span></p>
+				<h1 id="page-title">Compra fácil,<br><span>fresco y cerca.</span></h1>
 			</div>
-			<p class="intro-copy">Registra productos, mantén el stock al día y cobra tus ventas en un solo lugar.</p>
-		</section>
+			<p class="intro-copy">Explora el catálogo, encuentra tus productos favoritos y arma tu pedido.</p>
+			</section>
 
-		<section class="stats" aria-label="Resumen del inventario">
-			<article class="stat">
-				<span class="stat-label">Productos registrados</span>
-				<strong id="product-count" class="stat-value">0</strong>
-			</article>
-			<article class="stat">
-				<span class="stat-label">Unidades en tienda</span>
-				<strong id="unit-count" class="stat-value">0</strong>
-			</article>
-			<article class="stat stat-highlight">
-				<span class="stat-label">Valor del inventario</span>
-				<strong id="inventory-value" class="stat-value">$0.00</strong>
-			</article>
-			<article class="stat stat-rate">
-				<span class="stat-label">Tasa oficial BCV · Bs/USD</span>
-				<strong id="daily-rate-value" class="stat-value">Consultando...</strong>
-				<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="rate-updated">Buscando tasa del día</span></a>
-			</article>
-		</section>
-
-		<div class="workspace">
+			<div class="workspace shopping-workspace">
 			<section class="inventory-panel" aria-labelledby="inventory-title">
 				<div class="section-heading">
 					<div>
-						<p class="eyebrow">LO QUE TIENES</p>
-						<h2 id="inventory-title">Inventario</h2>
+						<p class="eyebrow">FRESCO Y SELECCIONADO</p>
+						<h2 id="inventory-title">Catálogo de productos</h2>
 					</div>
 					<label class="search-box" for="search-input">
 						<span class="search-icon" aria-hidden="true">⌕</span>
-						<input id="search-input" type="search" placeholder="Buscar producto" autocomplete="off">
+						<input id="search-input" type="search" placeholder="Buscar por nombre" autocomplete="off">
 					</label>
 				</div>
-
-				<div id="stock-alert" class="stock-alert" role="status" aria-live="polite" hidden></div>
-
-				<div class="table-wrap">
-					<table>
-						<thead>
-							<tr>
-								<th scope="col">Producto</th>
-								<th scope="col">Precio unitario</th>
-								<th scope="col">Disponibles</th>
-								<th scope="col">Acción</th>
-							</tr>
-						</thead>
-						<tbody id="product-list"></tbody>
-					</table>
-					<div id="empty-state" class="empty-state">
-						<span class="empty-icon" aria-hidden="true">＋</span>
-						<strong>Aún no hay productos</strong>
-						<span>Agrega el primero desde el formulario.</span>
-					</div>
-					<p id="no-results" class="no-results" hidden>No encontramos productos con ese nombre.</p>
+				<div id="category-filters" class="category-filters" role="group" aria-label="Filtrar productos por categoría">
+					<button class="category-filter active" type="button" data-category="Todos" aria-pressed="true">Todos</button>
+					<button class="category-filter" type="button" data-category="Carnes" aria-pressed="false">Carnes</button>
+					<button class="category-filter" type="button" data-category="Víveres" aria-pressed="false">Víveres</button>
+					<button class="category-filter" type="button" data-category="Bebidas" aria-pressed="false">Bebidas</button>
+					<button class="category-filter" type="button" data-category="Lácteos" aria-pressed="false">Lácteos</button>
+					<button class="category-filter" type="button" data-category="Otros" aria-pressed="false">Otros</button>
 				</div>
+				<div id="stock-alert" class="stock-alert" role="status" aria-live="polite" hidden></div>
+				<div id="catalog-products" class="catalog-grid"></div>
+				<div id="empty-state" class="empty-state">
+					<span class="empty-icon" aria-hidden="true">＋</span>
+					<strong>Aún no hay productos</strong>
+					<span>Pronto encontrarás productos en el catálogo.</span>
+				</div>
+				<p id="no-results" class="no-results" hidden>No encontramos productos con esos filtros.</p>
 			</section>
 
 			<aside class="side-column">
-				<section class="form-panel" aria-labelledby="form-title">
-					<p class="eyebrow">NUEVO EN LA TIENDA</p>
-					<h2 id="form-title">Agregar producto</h2>
-					<p class="panel-copy">Completa los datos para actualizar tu inventario.</p>
-
-					<form id="product-form">
-						<label class="field-label" for="product-name">Nombre del producto</label>
-						<input id="product-name" name="name" type="text" maxlength="60" placeholder="Ej. Café molido" required>
-
-						<div class="field-row">
-							<div>
-								<label class="field-label" for="product-price">Precio (USD)</label>
-								<div class="input-prefix"><span>$</span><input id="product-price" name="price" type="number" min="0.01" step="0.01" placeholder="0.00" required></div>
-							</div>
-							<div>
-								<label class="field-label" for="product-stock">Cantidad</label>
-								<input id="product-stock" name="stock" type="number" min="0" step="1" placeholder="0" required>
-							</div>
-						</div>
-
-						<p class="discount-note"><span aria-hidden="true">↘</span> 10% de descuento automático en precios mayores a $50.</p>
-						<button class="primary-button" type="submit"><span aria-hidden="true">＋</span> Agregar al inventario</button>
-						<p id="form-feedback" class="form-feedback" role="status" aria-live="polite"></p>
-					</form>
-				</section>
-
 				<section class="cart-panel" aria-labelledby="cart-title">
 					<div class="cart-heading">
 						<div>
@@ -184,7 +136,78 @@
 					<p id="purchase-delivery" class="purchase-delivery"></p>
 				</section>
 			</aside>
-		</div>
+			</div>
+		</section>
+
+		<section id="admin-view" class="app-view" aria-labelledby="admin-title" hidden>
+			<section class="intro admin-intro">
+				<div>
+					<p class="eyebrow">GESTIÓN DE LA TIENDA <span>·</span> <span id="admin-date"></span></p>
+					<h1 id="admin-title">Inventario,<br><span>bajo control.</span></h1>
+				</div>
+				<p class="intro-copy">Administra productos, cantidades disponibles y artículos agotados.</p>
+			</section>
+
+			<section class="stats" aria-label="Resumen del inventario">
+				<article class="stat"><span class="stat-label">Productos registrados</span><strong id="product-count" class="stat-value">0</strong></article>
+				<article class="stat"><span class="stat-label">Unidades en tienda</span><strong id="unit-count" class="stat-value">0</strong></article>
+				<article class="stat stat-highlight"><span class="stat-label">Valor del inventario</span><strong id="inventory-value" class="stat-value">$0.00</strong></article>
+				<article class="stat stat-alert"><span class="stat-label">Productos agotados</span><strong id="out-of-stock-count" class="stat-value">0</strong></article>
+				<article class="stat stat-rate">
+					<span class="stat-label">Tasa oficial BCV · Bs/USD</span>
+					<strong id="daily-rate-value" class="stat-value">Consultando...</strong>
+					<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="rate-updated">Buscando tasa del día</span></a>
+				</article>
+			</section>
+
+			<div class="admin-workspace">
+				<section class="inventory-panel admin-inventory-panel" aria-labelledby="admin-inventory-title">
+					<div class="section-heading">
+						<div><p class="eyebrow">CONTROL DE EXISTENCIAS</p><h2 id="admin-inventory-title">Inventario de productos</h2></div>
+						<label class="search-box" for="inventory-search-input"><span class="search-icon" aria-hidden="true">⌕</span><input id="inventory-search-input" type="search" placeholder="Buscar producto" autocomplete="off"></label>
+					</div>
+					<div class="admin-filter-row">
+						<label class="admin-filter-label" for="stock-filter">Mostrar</label>
+						<select id="stock-filter" class="stock-filter">
+							<option value="all">Todos los productos</option>
+							<option value="available">Con existencias</option>
+							<option value="out">Agotados</option>
+							<option value="low">Stock bajo (1–3)</option>
+						</select>
+					</div>
+					<div class="table-wrap">
+						<table>
+							<thead><tr><th scope="col">Producto</th><th scope="col">Categoría</th><th scope="col">Precio</th><th scope="col">Existencias</th><th scope="col">Estado / acción</th></tr></thead>
+							<tbody id="product-list"></tbody>
+						</table>
+						<p id="admin-empty-state" class="empty-state" hidden>No hay productos que coincidan.</p>
+					</div>
+				</section>
+				<aside class="admin-side-column">
+					<section class="form-panel" aria-labelledby="form-title">
+						<p class="eyebrow">NUEVO EN LA TIENDA</p>
+						<h2 id="form-title">Agregar producto</h2>
+						<p class="panel-copy">Completa los datos para actualizar el catálogo y el inventario.</p>
+						<form id="product-form">
+							<label class="field-label" for="product-name">Nombre del producto</label>
+							<input id="product-name" name="name" type="text" maxlength="60" placeholder="Ej. Café molido" required>
+							<label class="field-label" for="product-category">Categoría</label>
+							<select id="product-category" name="category" required>
+								<option value="Carnes">Carnes</option><option value="Víveres" selected>Víveres</option><option value="Bebidas">Bebidas</option><option value="Lácteos">Lácteos</option><option value="Otros">Otros</option>
+							</select>
+							<div class="field-row">
+								<div><label class="field-label" for="product-price">Precio (USD)</label><div class="input-prefix"><span>$</span><input id="product-price" name="price" type="number" min="0.01" step="0.01" placeholder="0.00" required></div></div>
+								<div><label class="field-label" for="product-stock">Cantidad inicial</label><input id="product-stock" name="stock" type="number" min="0" step="1" placeholder="0" required></div>
+							</div>
+							<p class="discount-note"><span aria-hidden="true">↘</span> 10% de descuento automático en precios mayores a $50.</p>
+							<button class="primary-button" type="submit"><span aria-hidden="true">＋</span> Agregar al inventario</button>
+							<p id="form-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+						</form>
+					</section>
+					<div id="admin-stock-alert" class="stock-alert admin-stock-alert" role="status" aria-live="polite" hidden></div>
+				</aside>
+			</div>
+		</section>
 
 		<dialog id="checkout-dialog" class="checkout-dialog" aria-labelledby="checkout-title">
 			<form id="checkout-form">
