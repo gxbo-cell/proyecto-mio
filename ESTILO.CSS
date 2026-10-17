@@ -327,6 +327,9 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .map-picker-actions button { min-width: 155px; }
 
 .stock-alert { margin: 0 0 14px; padding: 10px 12px; border-left: 3px solid var(--coral); border-radius: 2px; color: #80442f; background: #fff0e8; font-size: 11px; line-height: 1.5; }
+.catalog-feedback { min-height: 0; margin: -7px 0 10px; color: var(--green); font-size: 10px; }
+.catalog-feedback:empty { display: none; }
+.catalog-feedback.error { color: #ad4938; }
 .admin-side-column { display: grid; gap: 12px; }
 .admin-filter-row { display: flex; align-items: center; gap: 8px; margin: -5px 0 14px; }
 .admin-filter-label { color: var(--muted); font-size: 10px; }

@@ -43,6 +43,7 @@ const inventorySearchInput = document.querySelector("#inventory-search-input");
 const stockFilter = document.querySelector("#stock-filter");
 const formFeedback = document.querySelector("#form-feedback");
 const stockAlert = document.querySelector("#stock-alert");
+const catalogFeedback = document.querySelector("#catalog-feedback");
 const purchaseMessage = document.querySelector("#purchase-message");
 const purchaseTotal = document.querySelector("#purchase-total");
 const cartItems = document.querySelector("#cart-items");
@@ -221,6 +222,11 @@ function getDiscountedPrice(price) {
 function showFeedback(message, isError = false) {
 	formFeedback.textContent = message;
 	formFeedback.classList.toggle("error", isError);
+}
+
+function showCatalogFeedback(message, isError = false) {
+	catalogFeedback.textContent = message;
+	catalogFeedback.classList.toggle("error", isError);
 }
 
 function getCartQuantity(productId) {
@@ -579,7 +585,7 @@ function addToCart(productId, requestedQuantity, weightUnit) {
 		: Number(requestedQuantity);
 	const alreadyInCart = getCartQuantity(productId);
 	if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity + alreadyInCart > product.stock) {
-		showFeedback(product && isWeightProduct(product)
+		showCatalogFeedback(product && isWeightProduct(product)
 			? `Indica un peso válido, en existencias y mayor a 1 g (${formatWeight(Math.max(0, product.stock - alreadyInCart))} disponibles).`
 			: "La cantidad supera las unidades disponibles.", true);
 		return;
@@ -591,7 +597,7 @@ function addToCart(productId, requestedQuantity, weightUnit) {
 	} else {
 		cart.push({ productId, quantity });
 	}
-	showFeedback(`${product.name} añadido al carrito.`);
+	showCatalogFeedback(`${product.name} añadido al carrito.`);
 	renderCart();
 	renderProducts();
 }
@@ -604,7 +610,7 @@ function updateCartQuantity(productId, requestedQuantity, weightUnit) {
 		: Number(requestedQuantity);
 	if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > product.stock) {
 		renderCart();
-		showFeedback(product && isWeightProduct(product)
+		showCatalogFeedback(product && isWeightProduct(product)
 			? `El peso indicado no es válido o supera las existencias de ${formatWeight(product?.stock || 0)}.`
 			: "La cantidad indicada supera las unidades disponibles.", true);
 		return;
