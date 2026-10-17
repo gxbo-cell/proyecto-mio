@@ -139,10 +139,63 @@ function loadCachedRate() {
 function loadLatestDelivery() {
 	try {
 		const savedDelivery = JSON.parse(localStorage.getItem(DELIVERY_STORAGE_KEY) || "null");
-		return savedDelivery && Number.isInteger(savedDelivery.status) ? savedDelivery : null;
+		return savedDelivery && typeof savedDelivery.trackingCode === "string" ? savedDelivery : null;
 	} catch {
 		return null;
 	}
+}
+
+function loadDriverSession() {
+	try {
+		const savedSession = JSON.parse(localStorage.getItem(DRIVER_SESSION_KEY) || "null");
+		return savedSession && typeof savedSession.access_token === "string" ? savedSession : null;
+	} catch {
+		return null;
+	}
+}
+
+function isSupabaseConfigured() {
+	return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+}
+
+async function supabaseRequest(path, { method = "GET", body, token } = {}) {
+	if (!isSupabaseConfigured()) {
+		throw new Error("Falta configurar la URL del proyecto y la clave pública de Supabase en FUNCIONAMIENTO.JS.");
+	}
+	const headers = {
+		apikey: SUPABASE_ANON_KEY,
+		Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`
+	};
+	if (body !== undefined) {
+		headers["Content-Type"] = "application/json";
+	}
+	const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}${path}`, {
+		method,
+		headers,
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	const responseBody = await response.text();
+	let data = null;
+	if (responseBody) {
+		try {
+			data = JSON.parse(responseBody);
+		} catch {
+			throw new Error("Supabase devolvió una respuesta que no se pudo interpretar.");
+		}
+	}
+	if (!response.ok) {
+		const message = data?.msg || data?.message || data?.hint || data?.error_description || data?.error;
+		throw new Error(message || `La solicitud a Supabase falló (${response.status}).`);
+	}
+	return data;
+}
+
+async function callSupabaseFunction(name, body, token) {
+	return supabaseRequest(`/rest/v1/rpc/${encodeURIComponent(name)}`, {
+		method: "POST",
+		body,
+		token
+	});
 }
 
 async function loadDailyRate() {
