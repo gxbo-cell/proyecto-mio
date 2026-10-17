@@ -1127,15 +1127,10 @@ function getCoordinatesFromMapLink(mapLink) {
 function updateDeliveryMap() {
 	const coordinates = deliveryCoordinates || getCoordinatesFromMapLink(getValidatedMapLink());
 	if (coordinates) {
-		const mapUrl = new URL("https://www.openstreetmap.org/export/embed.html");
-		mapUrl.searchParams.set("bbox", [
-			coordinates.longitude - 0.01,
-			coordinates.latitude - 0.01,
-			coordinates.longitude + 0.01,
-			coordinates.latitude + 0.01
-		].join(","));
-		mapUrl.searchParams.set("layer", "mapnik");
-		mapUrl.searchParams.set("marker", `${coordinates.latitude},${coordinates.longitude}`);
+		const mapUrl = new URL("https://maps.google.com/maps");
+		mapUrl.searchParams.set("q", `${coordinates.latitude},${coordinates.longitude}`);
+		mapUrl.searchParams.set("z", "16");
+		mapUrl.searchParams.set("output", "embed");
 		deliveryMapPreview.src = mapUrl.href;
 		deliveryMapPreview.hidden = false;
 	} else {
@@ -1172,9 +1167,9 @@ function updateMapPicker() {
 			return;
 		}
 		mapPickerMap = L.map(mapPickerMapElement, { scrollWheelZoom: true }).setView([DELIVERY_ORIGIN.latitude, DELIVERY_ORIGIN.longitude], 12);
-		const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+		const tileLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
 			maxZoom: 19,
-			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
+			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>'
 		}).addTo(mapPickerMap);
 		tileLayer.once("tileerror", () => {
 			mapPickerFeedback.textContent = "No se pudieron cargar las calles del mapa. Prueba de nuevo o busca la dirección y confirma el pin.";
