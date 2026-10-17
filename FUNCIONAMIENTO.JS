@@ -20,12 +20,16 @@ const bolivarFormatter = new Intl.NumberFormat("es-VE", {
 
 const productForm = document.querySelector("#product-form");
 const productNameInput = document.querySelector("#product-name");
+const productCategoryInput = document.querySelector("#product-category");
 const productPriceInput = document.querySelector("#product-price");
 const productStockInput = document.querySelector("#product-stock");
 const productList = document.querySelector("#product-list");
+const catalogProducts = document.querySelector("#catalog-products");
 const emptyState = document.querySelector("#empty-state");
 const noResults = document.querySelector("#no-results");
 const searchInput = document.querySelector("#search-input");
+const inventorySearchInput = document.querySelector("#inventory-search-input");
+const stockFilter = document.querySelector("#stock-filter");
 const formFeedback = document.querySelector("#form-feedback");
 const stockAlert = document.querySelector("#stock-alert");
 const purchaseMessage = document.querySelector("#purchase-message");
@@ -72,6 +76,7 @@ let mapPickerMap;
 let mapPickerMarker;
 let deliveryFee = 0;
 let latestDelivery = loadLatestDelivery();
+let activeCategory = "Todos";
 
 function loadProducts() {
 	try {
@@ -82,7 +87,12 @@ function loadProducts() {
 				typeof product.name === "string" &&
 				Number.isFinite(product.price) && product.price > 0 &&
 				Number.isInteger(product.stock) && product.stock >= 0
-			)
+			).map((product) => ({
+				...product,
+				category: ["Carnes", "Víveres", "Bebidas", "Lácteos", "Otros"].includes(product.category)
+					? product.category
+					: "Otros"
+			}))
 			: [];
 	} catch {
 		return [];
