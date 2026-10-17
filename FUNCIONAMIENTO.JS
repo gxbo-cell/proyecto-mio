@@ -1133,7 +1133,7 @@ function useCurrentLocation() {
 	}, { enableHighAccuracy: true, timeout: 10000 });
 }
 
-async function completePurchase(paymentMethod) {
+function completePurchase(paymentMethod) {
 	const unavailable = cart.some((item) => {
 		const product = products.find((entry) => entry.id === item.productId);
 		return !product || item.quantity > product.stock;
@@ -1146,15 +1146,6 @@ async function completePurchase(paymentMethod) {
 	checkoutFeedback.textContent = "";
 	const confirmButton = document.querySelector("#confirm-payment");
 	confirmButton.disabled = true;
-	try {
-		if (deliveryToggle.checked) {
-			await createSharedDeliveryOrder(paymentMethod);
-		}
-	} catch (error) {
-		checkoutFeedback.textContent = `No se pudo enviar el pedido: ${error.message}`;
-		confirmButton.disabled = false;
-		return;
-	}
 
 	const total = getOrderTotal();
 	const deliveryLocation = deliveryToggle.checked ? getDeliveryLocation() : "";
@@ -1164,18 +1155,13 @@ async function completePurchase(paymentMethod) {
 		product.stock -= item.quantity;
 	}
 
-	const createdTrackingCode = deliveryLocation ? latestDelivery.trackingCode : "";
 	const itemCount = purchasedItems.length;
-	purchaseMessage.textContent = `${itemCount} ${itemCount === 1 ? "artículo" : "artículos"} · ${paymentMethod}${createdTrackingCode ? ` · Código ${createdTrackingCode}` : ""}`;
+	purchaseMessage.textContent = `${itemCount} ${itemCount === 1 ? "artículo" : "artículos"} · ${paymentMethod}`;
 	purchaseTotal.textContent = formatMoney(total);
 	document.querySelector("#purchase-total-bs").textContent = formatBolivars(total);
 	document.querySelector("#purchase-delivery").textContent = deliveryLocation
-		? `Delivery · ${deliveryLocation} · Buscando conductor · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
+		? `Delivery por coordinar con la tienda · ${deliveryLocation} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
 		: "Retiro en tienda";
-	if (!deliveryLocation) {
-		latestDelivery = null;
-		localStorage.removeItem(DELIVERY_STORAGE_KEY);
-	}
 	const exhaustedProducts = purchasedItems
 		.map((item) => products.find((entry) => entry.id === item.productId))
 		.filter((product) => product.stock === 0)
@@ -1190,8 +1176,6 @@ async function completePurchase(paymentMethod) {
 	cart = [];
 	deliveryToggle.checked = false;
 	deliveryAddress.value = "";
-	deliveryCustomerName.value = "";
-	deliveryCustomerPhone.value = "";
 	deliveryMapLink.value = "";
 	deliveryCoordinates = null;
 	deliveryFee = 0;
@@ -1204,11 +1188,10 @@ async function completePurchase(paymentMethod) {
 	confirmButton.disabled = false;
 	checkoutDialog.close();
 	showFeedback(deliveryLocation
-		? "Pedido enviado. Esperando que un conductor lo acepte."
+		? "Compra confirmada. El delivery no se envió a un conductor; coordínalo directamente con la tienda."
 		: "Compra confirmada.");
 	renderCart();
 	renderProducts();
-	renderLatestDeliveryTracking();
 }
 
 productForm.addEventListener("submit", (event) => {
