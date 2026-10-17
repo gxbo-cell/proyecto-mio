@@ -77,6 +77,7 @@ let mapPickerMarker;
 let deliveryFee = 0;
 let latestDelivery = loadLatestDelivery();
 let activeCategory = "Todos";
+let editingProductId = null;
 
 function loadProducts() {
 	try {
@@ -362,6 +363,11 @@ function renderAdminProducts() {
 		const status = document.createElement("span");
 		status.className = `stock-pill${product.stock === 0 ? " low" : product.stock <= 3 ? " low" : ""}`;
 		status.textContent = product.stock === 0 ? "Agotado" : product.stock <= 3 ? "Stock bajo" : "En stock";
+		const editButton = document.createElement("button");
+		editButton.className = "inventory-action-button";
+		editButton.type = "button";
+		editButton.textContent = "Editar";
+		editButton.addEventListener("click", () => beginProductEdit(product));
 		const updateButton = document.createElement("button");
 		updateButton.className = "inventory-action-button";
 		updateButton.type = "button";
@@ -372,12 +378,35 @@ function renderAdminProducts() {
 		deleteButton.type = "button";
 		deleteButton.textContent = "Eliminar";
 		deleteButton.addEventListener("click", () => deleteProduct(product.id));
-		actionWrap.append(status, updateButton, deleteButton);
+		actionWrap.append(status, editButton, updateButton, deleteButton);
 		actionCell.append(actionWrap);
 		row.append(nameCell, categoryCell, priceCell, stockCell, actionCell);
 		productList.append(row);
 	}
 	document.querySelector("#admin-empty-state").hidden = visibleProducts.length > 0;
+	productList.closest(".table-wrap").scrollLeft = 0;
+}
+
+function beginProductEdit(product) {
+	editingProductId = product.id;
+	productNameInput.value = product.name;
+	productCategoryInput.value = product.category;
+	productPriceInput.value = String(product.price);
+	productStockInput.value = String(product.stock);
+	document.querySelector("#submit-product-button").innerHTML = "<span aria-hidden=\"true\">✓</span> Guardar cambios";
+	document.querySelector("#cancel-edit-button").hidden = false;
+	showFeedback(`Editando ${product.name}.`);
+	productForm.scrollIntoView({ behavior: "smooth", block: "center" });
+	productNameInput.focus();
+}
+
+function cancelProductEdit() {
+	editingProductId = null;
+	productForm.reset();
+	document.querySelector("#submit-product-button").innerHTML = "<span aria-hidden=\"true\">＋</span> Agregar al inventario";
+	document.querySelector("#cancel-edit-button").hidden = true;
+	formFeedback.textContent = "";
+	formFeedback.classList.remove("error");
 }
 
 function updateProductStock(productId, requestedStock) {
@@ -1011,16 +1040,36 @@ productForm.addEventListener("submit", (event) => {
 		return;
 	}
 
-	products.push({
-		id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-		name,
-		price,
-		category: productCategoryInput.value,
-		stock
-	});
+	const editedProduct = editingProductId
+		? products.find((product) => product.id === editingProductId)
+		: null;
+	if (editingProductId && !editedProduct) {
+		showFeedback("No se encontró el producto que intentas editar. Actualiza la página e inténtalo de nuevo.", true);
+		return;
+	}
+	if (editedProduct) {
+		editedProduct.name = name;
+		editedProduct.price = price;
+		editedProduct.category = productCategoryInput.value;
+		editedProduct.stock = stock;
+		if (getCartQuantity(editedProduct.id) > stock) {
+			cart = cart.filter((item) => item.productId !== editedProduct.id);
+		}
+	} else {
+		products.push({
+			id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+			name,
+			price,
+			category: productCategoryInput.value,
+			stock
+		});
+	}
 	saveProducts();
 	productForm.reset();
-	showFeedback("Producto agregado al inventario.");
+	editingProductId = null;
+	document.querySelector("#submit-product-button").innerHTML = "<span aria-hidden=\"true\">＋</span> Agregar al inventario";
+	document.querySelector("#cancel-edit-button").hidden = true;
+	showFeedback(editedProduct ? "Cambios guardados en el producto." : "Producto agregado al inventario.");
 
 	if (stock === 0) {
 		stockAlert.textContent = `¡Atención! ${name} se registró sin unidades disponibles.`;
@@ -1031,8 +1080,10 @@ productForm.addEventListener("submit", (event) => {
 		stockAlert.hidden = true;
 	}
 	renderProducts();
+	renderCart();
 });
 
+document.querySelector("#cancel-edit-button").addEventListener("click", cancelProductEdit);
 searchInput.addEventListener("input", renderProducts);
 inventorySearchInput.addEventListener("input", renderAdminProducts);
 stockFilter.addEventListener("change", renderAdminProducts);
