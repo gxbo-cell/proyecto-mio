@@ -21,6 +21,7 @@
 		</a>
 		<nav class="view-switch" aria-label="Secciones de la tienda">
 			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true">Compras</button>
+			<button class="view-switch-button" type="button" data-view-target="driver-view" aria-pressed="false">Conductor</button>
 			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Administración</button>
 		</nav>
 	</header>
@@ -94,7 +95,7 @@
 						<textarea id="delivery-address" rows="3" maxlength="240" placeholder="Dirección, zona y punto de referencia"></textarea>
 						<div class="delivery-location-actions">
 							<button id="use-current-location" class="location-button" type="button"><span aria-hidden="true">⌖</span> Usar mi ubicación</button>
-							<button id="open-google-maps" class="map-button" type="button"><span aria-hidden="true">⌖</span> Elegir en Google Maps</button>
+							<button id="open-google-maps" class="map-button" type="button"><span aria-hidden="true">⌖</span> Elegir en el mapa</button>
 						</div>
 						<label class="field-label map-link-label" for="delivery-map-link">Enlace compartido de Google Maps</label>
 						<input id="delivery-map-link" class="map-link-input" type="url" placeholder="Pega aquí el enlace de la ubicación">
@@ -104,8 +105,11 @@
 							<div><span class="eyebrow">COSTO ESTIMADO</span><strong id="delivery-fee">$1.00</strong><small id="delivery-zone-description">Zona inicial · hasta 5 km</small></div>
 							<strong id="delivery-fee-bs" class="delivery-fee-bs"></strong>
 						</div>
-						<label class="field-label driver-field" for="delivery-driver">Conductor asignado</label>
-						<input id="delivery-driver" class="map-link-input" type="text" maxlength="60" placeholder="Nombre del conductor">
+						<label class="field-label driver-field" for="delivery-customer-name">Nombre de quien recibe</label>
+						<input id="delivery-customer-name" class="map-link-input" type="text" maxlength="100" autocomplete="name" placeholder="Nombre y apellido">
+						<label class="field-label driver-field" for="delivery-customer-phone">Teléfono de contacto</label>
+						<input id="delivery-customer-phone" class="map-link-input" type="tel" maxlength="30" autocomplete="tel" placeholder="Ej. 0412 123 4567">
+						<p class="delivery-note">El pedido aparecerá a los conductores disponibles. Tu nombre, teléfono y dirección se comparten con el conductor que lo acepte.</p>
 						<p class="delivery-note">Tarifa estimada: $1 por cada 5 km desde Caracas centro.</p>
 					</div>
 					<p id="delivery-feedback" class="form-feedback error" role="status" aria-live="polite"></p>
@@ -117,15 +121,17 @@
 							<p class="eyebrow">SEGUIMIENTO DE ENTREGA</p>
 							<h2 id="tracking-title">Tu pedido</h2>
 						</div>
-						<span id="tracking-status-badge" class="tracking-status-badge">Preparando</span>
+						<span id="tracking-status-badge" class="tracking-status-badge">Esperando conductor</span>
 					</div>
-					<p id="tracking-headline" class="tracking-headline">Tu pedido está siendo preparado.</p>
+					<p id="tracking-headline" class="tracking-headline">Tu pedido se enviará a los conductores disponibles.</p>
 					<p id="tracking-driver" class="tracking-driver"></p>
+					<div id="tracking-driver-details" class="tracking-driver-details" hidden></div>
+					<p id="tracking-code" class="tracking-code"></p>
 					<div class="tracking-progress" aria-hidden="true"><span id="tracking-progress-fill"></span></div>
 					<ol class="tracking-steps">
-						<li><button class="tracking-step" type="button" data-delivery-step="0"><span class="tracking-step-marker">1</span><span class="tracking-step-label">Recogió el pedido</span></button></li>
-						<li><button class="tracking-step" type="button" data-delivery-step="1"><span class="tracking-step-marker">2</span><span class="tracking-step-label">Pedido en camino</span></button></li>
-						<li><button class="tracking-step" type="button" data-delivery-step="2"><span class="tracking-step-marker">3</span><span class="tracking-step-label">Pedido entregado</span></button></li>
+						<li><span class="tracking-step"><span class="tracking-step-marker">1</span><span class="tracking-step-label">Recogió el pedido</span></span></li>
+						<li><span class="tracking-step"><span class="tracking-step-marker">2</span><span class="tracking-step-label">Pedido en camino</span></span></li>
+						<li><span class="tracking-step"><span class="tracking-step-marker">3</span><span class="tracking-step-label">Pedido entregado</span></span></li>
 					</ol>
 				</section>
 
@@ -138,6 +144,54 @@
 					<p id="purchase-delivery" class="purchase-delivery"></p>
 				</section>
 			</aside>
+			</div>
+		</section>
+
+		<section id="driver-view" class="app-view" aria-labelledby="driver-page-title" hidden>
+			<section class="intro">
+				<div>
+					<p class="eyebrow">REPARTOS DE LA TIENDA <span>·</span> <span id="driver-date"></span></p>
+					<h1 id="driver-page-title">Pedidos,<br><span>en camino.</span></h1>
+				</div>
+				<p class="intro-copy">Conéctate para ver los pedidos pendientes, aceptar uno y actualizar su entrega.</p>
+			</section>
+			<div id="driver-setup-notice" class="backend-notice" hidden></div>
+			<div class="driver-workspace">
+				<section class="form-panel driver-login-panel" aria-labelledby="driver-login-title">
+					<p class="eyebrow">ACCESO DE CONDUCTOR</p>
+					<h2 id="driver-login-title">Iniciar sesión</h2>
+					<p class="panel-copy">Usa la cuenta de conductor que creó la tienda.</p>
+					<form id="driver-login-form">
+						<label class="field-label" for="driver-email">Correo</label>
+						<input id="driver-email" type="email" autocomplete="username" required>
+						<label class="field-label" for="driver-password">Contraseña</label>
+						<input id="driver-password" type="password" autocomplete="current-password" required>
+						<button class="primary-button driver-login-button" type="submit">Entrar</button>
+						<p id="driver-login-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+					</form>
+					<div id="driver-session" hidden>
+						<p id="driver-session-name" class="driver-session-name"></p>
+						<p id="driver-session-vehicle" class="driver-session-vehicle"></p>
+						<button id="driver-logout" class="secondary-button driver-login-button" type="button">Cerrar sesión</button>
+					</div>
+				</section>
+				<div class="driver-order-lists">
+					<section class="inventory-panel driver-orders-panel" aria-labelledby="available-orders-title">
+						<div class="section-heading driver-orders-heading">
+							<div><p class="eyebrow">DISPONIBLES PARA ACEPTAR</p><h2 id="available-orders-title">Pedidos nuevos</h2></div>
+							<button id="refresh-driver-orders" class="secondary-button refresh-orders-button" type="button">Actualizar</button>
+						</div>
+						<div id="available-orders" class="driver-order-list"></div>
+						<p id="available-orders-empty" class="empty-state driver-empty-state">Inicia sesión para buscar pedidos.</p>
+					</section>
+					<section class="inventory-panel driver-orders-panel" aria-labelledby="my-orders-title">
+						<div class="section-heading driver-orders-heading">
+							<div><p class="eyebrow">TUS ENTREGAS</p><h2 id="my-orders-title">Pedidos aceptados</h2></div>
+						</div>
+						<div id="my-driver-orders" class="driver-order-list"></div>
+						<p id="my-orders-empty" class="empty-state driver-empty-state">Todavía no tienes entregas activas.</p>
+					</section>
+				</div>
 			</div>
 		</section>
 
