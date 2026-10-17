@@ -104,6 +104,7 @@ let activeCategory = "Todos";
 let editingProductId = null;
 let driverSession = loadDriverSession();
 let driverOrdersTimer;
+let trackingTimer;
 
 function loadProducts() {
 	try {
@@ -876,15 +877,14 @@ function getMapSearchQuery() {
 	}
 	const mapLink = getValidatedMapLink();
 	if (mapLink) {
-		const coordinates = mapLink.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
-			mapLink.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+		const coordinates = getCoordinatesFromMapLink(mapLink);
 		if (coordinates) {
-			return `${coordinates[1]},${coordinates[2]}`;
+			return `${coordinates.latitude},${coordinates.longitude}`;
 		}
 		try {
 			const url = new URL(mapLink);
 			const search = url.searchParams.get("query") || url.searchParams.get("q");
-			if (search) {
+			if (search && !search.includes("://")) {
 				return search;
 			}
 		} catch {
@@ -892,6 +892,21 @@ function getMapSearchQuery() {
 		}
 	}
 	return deliveryAddress.value.trim();
+}
+
+function getCoordinatesFromMapLink(mapLink) {
+	const patterns = [
+		/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+		/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+		/[?&](?:query|q)=(-?\d+(?:\.\d+)?)(?:%2C|,|\s)+(-?\d+(?:\.\d+)?)/
+	];
+	for (const pattern of patterns) {
+		const match = mapLink.match(pattern);
+		if (match) {
+			return { latitude: Number(match[1]), longitude: Number(match[2]) };
+		}
+	}
+	return null;
 }
 
 function updateDeliveryMap() {
@@ -906,10 +921,14 @@ function updateDeliveryMap() {
 }
 
 function openMapPicker() {
-	mapPickerCoordinates = deliveryCoordinates ? { ...deliveryCoordinates } : null;
+	mapPickerCoordinates = deliveryCoordinates
+		? { ...deliveryCoordinates }
+		: getCoordinatesFromMapLink(getValidatedMapLink());
 	mapPickerInput.value = deliveryCoordinates
 		? `${deliveryCoordinates.latitude.toFixed(6)}, ${deliveryCoordinates.longitude.toFixed(6)}`
-		: deliveryAddress.value.trim() || getMapSearchQuery();
+		: mapPickerCoordinates
+			? `${mapPickerCoordinates.latitude}, ${mapPickerCoordinates.longitude}`
+			: deliveryAddress.value.trim() || getMapSearchQuery();
 	mapPickerFeedback.textContent = mapPickerInput.value
 		? "Busca la dirección y marca el punto exacto en el mapa."
 		: "Busca una dirección o toca el mapa para colocar el pin.";
@@ -957,7 +976,7 @@ function updateMapPicker() {
 		: "";
 	document.querySelector("#open-map-picker-google").href = mapPickerCoordinates
 		? `https://www.google.com/maps/search/?api=1&query=${mapPickerCoordinates.latitude},${mapPickerCoordinates.longitude}`
-		: "https://www.google.com/maps";
+		: getValidatedMapLink() || "https://www.google.com/maps";
 }
 
 async function searchMapLocation() {
@@ -1276,6 +1295,13 @@ async function renderLatestDeliveryTracking() {
 		document.querySelector("#tracking-status-badge").textContent = "Pedido no encontrado";
 		document.querySelector("#tracking-headline").textContent = "Revisa el código privado de seguimiento.";
 		return;
+	}
+	if (!trackingTimer) {
+		trackingTimer = window.setInterval(() => {
+			if (latestDelivery) {
+				void renderLatestDeliveryTracking();
+			}
+		}, 10000);
 	}
 	latestDelivery.status = tracking.status;
 	try {
@@ -1751,12 +1777,19 @@ deliveryAddress.addEventListener("input", () => {
 	updateDeliveryMap();
 });
 deliveryMapLink.addEventListener("input", () => {
-	deliveryCoordinates = null;
-	updateDeliveryEstimate();
 	const validLink = getValidatedMapLink();
-	mapFeedback.textContent = deliveryMapLink.value.trim() && !validLink
-		? "Pega un enlace https válido de Google Maps."
-		: "Enlace de Google Maps listo.";
+	deliveryCoordinates = validLink ? getCoordinatesFromMapLink(validLink) : null;
+	if (deliveryCoordinates) {
+		updateDeliveryEstimate();
+		mapFeedback.textContent = "Ubicación de Google Maps reconocida. Abre el selector para verificar el pin.";
+	} else {
+		updateDeliveryEstimate();
+		mapFeedback.textContent = deliveryMapLink.value.trim() && !validLink
+			? "Pega un enlace https válido de Google Maps."
+			: validLink
+				? "El enlace no incluye coordenadas visibles. Ábrelo en Google Maps y marca el pin en el selector."
+				: "Escribe una dirección, usa GPS o pega un enlace de Google Maps.";
+	}
 	updateDeliveryMap();
 });
 useCurrentLocationButton.addEventListener("click", useCurrentLocation);
