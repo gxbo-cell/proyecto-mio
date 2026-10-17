@@ -499,8 +499,10 @@ function beginProductEdit(product) {
 	editingProductId = product.id;
 	productNameInput.value = product.name;
 	productCategoryInput.value = product.category;
+	productSaleModeInput.value = product.saleMode;
 	productPriceInput.value = String(product.price);
-	productStockInput.value = String(product.stock);
+	productStockInput.value = String(getStockAmount(product));
+	configureProductFormMode();
 	document.querySelector("#submit-product-button").textContent = "✓ Guardar cambios";
 	document.querySelector("#cancel-edit-button").hidden = false;
 	showFeedback(`Editando ${product.name}.`);
@@ -511,6 +513,7 @@ function beginProductEdit(product) {
 function cancelProductEdit() {
 	editingProductId = null;
 	productForm.reset();
+	configureProductFormMode();
 	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
 	document.querySelector("#cancel-edit-button").hidden = true;
 	formFeedback.textContent = "";
@@ -519,9 +522,16 @@ function cancelProductEdit() {
 
 function updateProductStock(productId, requestedStock) {
 	const product = products.find((item) => item.id === productId);
-	const stock = Number(requestedStock);
-	if (!product || !Number.isInteger(stock) || stock < 0) {
-		showFeedback("La existencia debe ser un número entero igual o mayor que cero.", true);
+	const amount = Number(requestedStock);
+	const weightProduct = product && isWeightProduct(product);
+	const stock = weightProduct ? getStoredStock(amount, "weight") : amount;
+	if (!product || !Number.isFinite(amount) || amount < 0 ||
+		(weightProduct
+			? Math.abs(amount * GRAMS_PER_KILOGRAM - stock) > 1e-6
+			: !Number.isInteger(stock))) {
+		showFeedback(weightProduct
+			? "Ingresa existencias en kg con hasta tres decimales."
+			: "La existencia debe ser un número entero igual o mayor que cero.", true);
 		return;
 	}
 	if (editingProductId === productId) {
@@ -1129,7 +1139,7 @@ function completePurchase(paymentMethod) {
 		product.stock -= item.quantity;
 	}
 
-	const itemCount = purchasedItems.reduce((count, item) => count + item.quantity, 0);
+	const itemCount = purchasedItems.length;
 	purchaseMessage.textContent = `${itemCount} ${itemCount === 1 ? "artículo" : "artículos"} · ${paymentMethod}`;
 	purchaseTotal.textContent = formatMoney(total);
 	document.querySelector("#purchase-total-bs").textContent = formatBolivars(total);
@@ -1182,10 +1192,18 @@ productForm.addEventListener("submit", (event) => {
 	event.preventDefault();
 	const name = productNameInput.value.trim();
 	const price = Number(productPriceInput.value);
-	const stock = Number(productStockInput.value);
+	const stockAmount = Number(productStockInput.value);
+	const saleMode = productSaleModeInput.value;
+	const stock = getStoredStock(stockAmount, saleMode);
+	const invalidWeightPrecision = saleMode === "weight" &&
+		Math.abs(stockAmount * GRAMS_PER_KILOGRAM - stock) > 1e-6;
 
-	if (!name || !Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
-		showFeedback("Revisa el nombre, el precio y la cantidad ingresados.", true);
+	if (!name || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stockAmount) ||
+		stockAmount < 0 || (saleMode === "unit" && !Number.isInteger(stockAmount)) ||
+		invalidWeightPrecision || (stockAmount > 0 && stock === 0)) {
+		showFeedback(saleMode === "weight"
+			? "Revisa el nombre, el precio por kg y las existencias (kg, hasta tres decimales)."
+			: "Revisa el nombre, el precio y la cantidad entera ingresados.", true);
 		return;
 	}
 
@@ -1198,11 +1216,13 @@ productForm.addEventListener("submit", (event) => {
 		return;
 	}
 	if (editedProduct) {
+		const saleModeChanged = editedProduct.saleMode !== saleMode;
 		editedProduct.name = name;
 		editedProduct.price = price;
 		editedProduct.category = productCategoryInput.value;
+		editedProduct.saleMode = saleMode;
 		editedProduct.stock = stock;
-		if (getCartQuantity(editedProduct.id) > stock) {
+		if (saleModeChanged || getCartQuantity(editedProduct.id) > stock) {
 			cart = cart.filter((item) => item.productId !== editedProduct.id);
 			cartItemRemoved = true;
 		}
@@ -1212,11 +1232,13 @@ productForm.addEventListener("submit", (event) => {
 			name,
 			price,
 			category: productCategoryInput.value,
+			saleMode,
 			stock
 		});
 	}
 	saveProducts();
 	productForm.reset();
+	configureProductFormMode();
 	editingProductId = null;
 	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
 	document.querySelector("#cancel-edit-button").hidden = true;
@@ -1227,9 +1249,9 @@ productForm.addEventListener("submit", (event) => {
 		: "Producto agregado al inventario.");
 
 	if (stock === 0) {
-		stockAlert.textContent = `¡Atención! ${name} ${editedProduct ? "quedó" : "se registró"} sin unidades disponibles.`;
+		stockAlert.textContent = `¡Atención! ${name} ${editedProduct ? "quedó" : "se registró"} sin existencias.`;
 		stockAlert.hidden = false;
-		document.querySelector("#admin-stock-alert").textContent = `“${name}” fue agregado sin existencias.`;
+		document.querySelector("#admin-stock-alert").textContent = `“${name}” ${editedProduct ? "está" : "fue agregado"} sin existencias.`;
 		document.querySelector("#admin-stock-alert").hidden = false;
 	} else {
 		stockAlert.hidden = true;
@@ -1239,6 +1261,27 @@ productForm.addEventListener("submit", (event) => {
 });
 
 document.querySelector("#cancel-edit-button").addEventListener("click", cancelProductEdit);
+productCategoryInput.addEventListener("change", () => {
+	if (editingProductId) {
+		return;
+	}
+	const nextMode = ["Carnes", "Charcutería"].includes(productCategoryInput.value) ? "weight" : "unit";
+	if (nextMode !== productSaleModeInput.value) {
+		productStockInput.value = "";
+		productSaleModeInput.value = nextMode;
+		configureProductFormMode();
+	}
+});
+productSaleModeInput.addEventListener("change", () => {
+	if (editingProductId) {
+		const product = products.find((entry) => entry.id === editingProductId);
+		if (product && product.saleMode !== productSaleModeInput.value) {
+			productStockInput.value = "";
+			showFeedback(`Cambiaste la forma de venta. Ingresa las existencias actuales en ${productSaleModeInput.value === "weight" ? "kg" : "unidades"}.`);
+		}
+	}
+	configureProductFormMode();
+});
 searchInput.addEventListener("input", renderProducts);
 inventorySearchInput.addEventListener("input", renderAdminProducts);
 stockFilter.addEventListener("change", renderAdminProducts);
@@ -1369,5 +1412,6 @@ document.querySelector("#admin-date").textContent = new Intl.DateTimeFormat("es"
 
 renderProducts();
 renderCart();
+configureProductFormMode();
 loadDailyRate();
 renderLatestDeliveryTracking();
