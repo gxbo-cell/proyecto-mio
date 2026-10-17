@@ -250,6 +250,21 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .driver-registration-actions { margin-top: 0; }
 .driver-registration-actions button { min-height: 40px; }
 .driver-registration-status { margin: 7px 0 0; }
+.supabase-setup-panel { margin: 0 0 22px; padding: 20px 22px; border: 1px solid #dce7dc; border-radius: 5px; background: linear-gradient(145deg, #f5f8f2, #fffefa 72%); }
+.supabase-setup-heading { align-items: center; margin-bottom: 8px; }
+.supabase-setup-heading h2 { margin: 0; font-size: 20px; }
+.setup-status { padding: 6px 10px; border-radius: 20px; color: #765a45; background: #f7eee3; font-size: 9px; font-weight: 700; }
+.setup-status.is-connected { color: var(--green-dark); background: #e5efe4; }
+.supabase-setup-panel > .panel-copy { max-width: 760px; margin: 8px 0 10px; }
+.supabase-setup-steps { display: grid; gap: 6px; margin: 12px 0 17px; padding-left: 20px; color: #545b51; font-size: 10px; line-height: 1.55; }
+.supabase-setup-steps a { color: var(--green); font-weight: 700; }
+.supabase-setup-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 11px 14px; }
+.supabase-setup-form > div { min-width: 0; }
+.supabase-setup-form input { width: 100%; }
+.supabase-setup-actions { display: flex; align-items: center; gap: 8px; }
+.supabase-setup-actions button { min-height: 38px; }
+.supabase-setup-feedback { grid-column: 1 / -1; }
+.supabase-setup-security { margin: 8px 0 0; color: #74786f; font-size: 9px; line-height: 1.5; }
 
 .delivery-panel { padding: 19px 22px; border: 1px solid #e7e4db; border-radius: 5px; background: #f8f7f2; }
 .delivery-panel .eyebrow { margin-bottom: 5px; }
@@ -454,6 +469,12 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 	.driver-registration-full { grid-column: auto; }
 	.driver-registration-actions { flex-direction: column-reverse; }
 	.driver-registration-actions button { width: 100%; }
+	.supabase-setup-panel { padding: 17px 14px; }
+	.supabase-setup-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+	.supabase-setup-form { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+	.supabase-setup-actions { align-items: stretch; flex-direction: column; }
+	.supabase-setup-actions button { width: 100%; }
+	.supabase-setup-feedback { grid-column: auto; }
 	.form-panel { padding: 20px; }
 	.cart-panel { padding: 18px 20px; }
 	.checkout-dialog { padding: 21px; }
