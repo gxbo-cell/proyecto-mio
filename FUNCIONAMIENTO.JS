@@ -85,6 +85,7 @@ const mapPickerInput = document.querySelector("#map-picker-input");
 const mapPickerSuggestions = document.querySelector("#map-picker-suggestions");
 const mapPickerMapElement = document.querySelector("#map-picker-map");
 const mapPickerFeedback = document.querySelector("#map-picker-feedback");
+const mapBusinessFeedback = document.querySelector("#map-business-feedback");
 const mapPickerCurrentLocationButton = document.querySelector("#map-picker-current-location");
 const salesOrdersList = document.querySelector("#sales-orders-list");
 const salesEmptyState = document.querySelector("#sales-empty-state");
@@ -105,8 +106,11 @@ let mapPickerSearchTimer;
 let mapSuggestionRequestId = 0;
 let mapSuggestionItems = [];
 let activeMapSuggestionIndex = -1;
+let mapPlacesRequestId = 0;
+let mapPlacesSearchTimer;
 let mapPickerMap;
 let mapPickerMarker;
+let mapPlacesLayer;
 let deliveryFee = 0;
 let activeCategory = "Todos";
 let editingProductId = null;
@@ -1183,6 +1187,9 @@ function updateMapPicker() {
 			maxZoom: 19,
 			attribution: "Tiles &copy; Esri"
 		}).addTo(mapPickerMap);
+		mapPlacesLayer = L.layerGroup().addTo(mapPickerMap);
+		mapPickerMap.on("moveend", scheduleNearbyPlacesSearch);
+		loadNearbyPlaces();
 		tileLayer.once("tileerror", () => {
 			mapPickerFeedback.textContent = "No se pudieron cargar las calles del mapa. Prueba de nuevo o busca la dirección y confirma el pin.";
 		});
@@ -1208,6 +1215,93 @@ function updateMapPicker() {
 	document.querySelector("#open-map-picker-google").href = mapPickerCoordinates
 		? `https://www.google.com/maps/search/?api=1&query=${mapPickerCoordinates.latitude},${mapPickerCoordinates.longitude}`
 		: getValidatedMapLink() || "https://www.google.com/maps";
+}
+
+function scheduleNearbyPlacesSearch() {
+	window.clearTimeout(mapPlacesSearchTimer);
+	mapPlacesSearchTimer = window.setTimeout(loadNearbyPlaces, 500);
+}
+
+function isNearbyBusiness(feature) {
+	const { osm_key: key, osm_value: value, name } = feature.properties;
+	if (!name || ["highway", "building", "place", "boundary", "natural", "landuse"].includes(key)) {
+		return false;
+	}
+	if (["shop", "office", "craft", "tourism", "leisure", "healthcare", "emergency"].includes(key)) {
+		return true;
+	}
+	return key === "amenity" && !["bench", "waste_basket", "waste_disposal", "bicycle_parking", "parking_space"].includes(value);
+}
+
+function createBusinessPopup(feature) {
+	const content = document.createElement("div");
+	const name = document.createElement("strong");
+	name.textContent = feature.properties.name;
+	content.append(name);
+	const category = [feature.properties.osm_key, feature.properties.osm_value]
+		.filter(Boolean)
+		.join(" · ");
+	if (category) {
+		const detail = document.createElement("div");
+		detail.textContent = category;
+		content.append(detail);
+	}
+	return content;
+}
+
+async function loadNearbyPlaces() {
+	if (!mapPickerMap || !mapPlacesLayer || mapPickerMap.getZoom() < 12) {
+		mapBusinessFeedback.textContent = "Acércate al mapa para ver comercios y servicios cercanos.";
+		return;
+	}
+	const requestId = ++mapPlacesRequestId;
+	const center = mapPickerMap.getCenter();
+	const bounds = mapPickerMap.getBounds();
+	const centerLabel = `${center.lat.toFixed(3)}, ${center.lng.toFixed(3)}`;
+	mapBusinessFeedback.textContent = "Buscando comercios y servicios cercanos...";
+	try {
+		const placesUrl = new URL("https://photon.komoot.io/reverse");
+		placesUrl.searchParams.set("lat", String(center.lat));
+		placesUrl.searchParams.set("lon", String(center.lng));
+		placesUrl.searchParams.set("limit", "50");
+		const response = await fetch(placesUrl, { headers: { Accept: "application/json" } });
+		if (!response.ok) {
+			throw new Error("No se pudieron cargar los comercios cercanos.");
+		}
+		const data = await response.json();
+		if (requestId !== mapPlacesRequestId || centerLabel !== `${mapPickerMap.getCenter().lat.toFixed(3)}, ${mapPickerMap.getCenter().lng.toFixed(3)}`) {
+			return;
+		}
+		if (!Array.isArray(data.features)) {
+			throw new Error("La respuesta de comercios no es válida.");
+		}
+		const businesses = data.features.filter((feature) => {
+			const [longitude, latitude] = feature.geometry.coordinates;
+			return isNearbyBusiness(feature) && bounds.contains([latitude, longitude]);
+		});
+		mapPlacesLayer.clearLayers();
+		for (const feature of businesses) {
+			const [longitude, latitude] = feature.geometry.coordinates;
+			const popup = createBusinessPopup(feature);
+			L.circleMarker([latitude, longitude], {
+				radius: 7,
+				color: "#ffffff",
+				weight: 2,
+				fillColor: "#e67d5e",
+				fillOpacity: 1
+			})
+				.bindPopup(popup)
+				.addTo(mapPlacesLayer)
+				.on("click", () => setMapPickerSelection({ lat: latitude, lng: longitude }));
+		}
+		mapBusinessFeedback.textContent = businesses.length
+			? `${businesses.length} comercios y servicios cercanos en esta zona. Toca un marcador para elegirlo.`
+			: "No hay comercios registrados en los datos abiertos de esta zona.";
+	} catch {
+		if (requestId === mapPlacesRequestId) {
+			mapBusinessFeedback.textContent = "No se pudieron cargar los comercios. Puedes seguir marcando el punto en el mapa.";
+		}
+	}
 }
 
 function hideMapSuggestions() {
