@@ -65,11 +65,25 @@ create table if not exists public.driver_documents (
 alter table public.driver_documents enable row level security;
 revoke all on public.driver_documents from anon, authenticated;
 
+create or replace function public.can_manage_my_driver_documents()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+	select exists (
+		select 1 from public.drivers
+		where user_id = auth.uid() and not active
+	);
+$$;
+
 drop policy if exists "Drivers upload their own private documents" on storage.objects;
 create policy "Drivers upload their own private documents"
 	on storage.objects for insert to authenticated
 	with check (
 		bucket_id = 'driver-documents'
+		and public.can_manage_my_driver_documents()
 		and (storage.foldername(name))[1] = auth.uid()::text
 		and (storage.foldername(name))[2] in ('identity', 'license', 'vehicle_registration', 'insurance')
 	);
@@ -79,10 +93,12 @@ create policy "Drivers replace their own private documents"
 	on storage.objects for update to authenticated
 	using (
 		bucket_id = 'driver-documents'
+		and public.can_manage_my_driver_documents()
 		and (storage.foldername(name))[1] = auth.uid()::text
 	)
 	with check (
 		bucket_id = 'driver-documents'
+		and public.can_manage_my_driver_documents()
 		and (storage.foldername(name))[1] = auth.uid()::text
 		and (storage.foldername(name))[2] in ('identity', 'license', 'vehicle_registration', 'insurance')
 	);
@@ -92,6 +108,7 @@ create policy "Drivers delete their own private documents"
 	on storage.objects for delete to authenticated
 	using (
 		bucket_id = 'driver-documents'
+		and public.can_manage_my_driver_documents()
 		and (storage.foldername(name))[1] = auth.uid()::text
 	);
 
@@ -246,6 +263,10 @@ begin
 		or p_document_type not in ('identity', 'license', 'vehicle_registration', 'insurance')
 		or p_object_path is null
 		or p_object_path <> auth.uid()::text || '/' || p_document_type || '/document'
+		or not exists (
+			select 1 from public.drivers
+			where user_id = auth.uid() and not active
+		)
 		or not exists (
 			select 1 from storage.objects
 			where bucket_id = 'driver-documents' and name = p_object_path
@@ -572,6 +593,7 @@ revoke all on function public.get_my_driver_profile() from public;
 revoke all on function public.register_my_driver_profile(text, text, text, date, text, text, date, text, text, text, text, text, integer, text, text, text, text, date) from public;
 revoke all on function public.record_my_driver_document(text, text) from public;
 revoke all on function public.activate_my_driver_profile() from public;
+revoke all on function public.can_manage_my_driver_documents() from public;
 
 grant execute on function public.create_delivery_order(uuid, text, text, jsonb, numeric, numeric, text, double precision, double precision, text) to anon, authenticated;
 grant execute on function public.list_available_delivery_orders() to authenticated;
@@ -583,3 +605,4 @@ grant execute on function public.get_my_driver_profile() to authenticated;
 grant execute on function public.register_my_driver_profile(text, text, text, date, text, text, date, text, text, text, text, text, integer, text, text, text, text, date) to authenticated;
 grant execute on function public.record_my_driver_document(text, text) to authenticated;
 grant execute on function public.activate_my_driver_profile() to authenticated;
+grant execute on function public.can_manage_my_driver_documents() to authenticated;
