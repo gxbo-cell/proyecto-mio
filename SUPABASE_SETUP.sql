@@ -191,6 +191,13 @@ begin
 		raise exception 'Inicia sesión para registrar tu perfil de conductor.';
 	end if;
 
+	if exists (
+		select 1 from public.drivers
+		where user_id = auth.uid() and active
+	) then
+		raise exception 'El perfil ya está activo. Contacta a la tienda si necesitas actualizar tus datos.';
+	end if;
+
 	if length(trim(coalesce(p_full_name, ''))) not between 2 and 100
 		or length(trim(coalesce(p_phone, ''))) not between 7 and 30
 		or length(trim(coalesce(p_national_id, ''))) not between 5 and 24
