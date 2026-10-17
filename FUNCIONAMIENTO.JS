@@ -85,6 +85,7 @@ const mapPickerFeedback = document.querySelector("#map-picker-feedback");
 const mapPickerCurrentLocationButton = document.querySelector("#map-picker-current-location");
 const salesOrdersList = document.querySelector("#sales-orders-list");
 const salesEmptyState = document.querySelector("#sales-empty-state");
+const salesFilterEmpty = document.querySelector("#sales-filter-empty");
 const salesFeedback = document.querySelector("#sales-feedback");
 const salesStatusFilter = document.querySelector("#sales-status-filter");
 const pendingOrderCount = document.querySelector("#pending-order-count");
@@ -661,6 +662,7 @@ function renderSales() {
 	}
 	salesEmptyState.hidden = orders.length > 0;
 	salesOrdersList.hidden = visibleOrders.length === 0;
+	salesFilterEmpty.hidden = orders.length === 0 || visibleOrders.length > 0;
 }
 
 function createOrderAction(orderId, action, label, className) {
@@ -1372,33 +1374,40 @@ function completePurchase(paymentMethod) {
 
 	checkoutFeedback.textContent = "";
 	const confirmButton = document.querySelector("#confirm-payment");
-	confirmButton.disabled = true;
-
 	const total = getOrderTotal();
 	const deliveryLocation = deliveryToggle.checked ? getDeliveryLocation() : "";
-	const purchasedItems = cart.map((item) => ({ ...item }));
-	for (const item of purchasedItems) {
-		const product = products.find((entry) => entry.id === item.productId);
-		product.stock -= item.quantity;
+	const order = {
+		id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+		createdAt: new Date().toISOString(),
+		status: "pending",
+		paymentMethod,
+		total,
+		delivery: deliveryLocation ? { location: deliveryLocation, fee: deliveryFee } : null,
+		items: cart.map((item) => {
+			const product = products.find((entry) => entry.id === item.productId);
+			return {
+				productId: product.id,
+				name: product.name,
+				saleMode: product.saleMode,
+				quantity: item.quantity,
+				price: getDiscountedPrice(product.price),
+				lineTotal: getCartLineTotal(product, item.quantity)
+			};
+		})
+	};
+	orders.unshift(order);
+	if (!saveOrders()) {
+		orders.shift();
+		checkoutFeedback.textContent = "No se pudo guardar el pedido en este navegador. La compra sigue en el carrito; inténtalo de nuevo.";
+		return;
 	}
 
-	const itemCount = purchasedItems.length;
-	purchaseMessage.textContent = `${itemCount} ${itemCount === 1 ? "artículo" : "artículos"} · ${paymentMethod}`;
+	purchaseMessage.textContent = `${getOrderDisplayId(order)} · Por aceptar · ${paymentMethod}`;
 	purchaseTotal.textContent = formatMoney(total);
 	document.querySelector("#purchase-total-bs").textContent = formatBolivars(total);
 	document.querySelector("#purchase-delivery").textContent = deliveryLocation
-		? `Delivery por coordinar con la tienda · ${deliveryLocation} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
+		? `Pedido enviado a ventas · ${deliveryLocation} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
 		: "Retiro en tienda";
-	const exhaustedProducts = purchasedItems
-		.map((item) => products.find((entry) => entry.id === item.productId))
-		.filter((product) => product.stock === 0)
-		.map((product) => product.name);
-	if (exhaustedProducts.length > 0) {
-		stockAlert.textContent = `¡Atención! Sin unidades disponibles: ${exhaustedProducts.join(", ")}.`;
-		stockAlert.hidden = false;
-	} else {
-		stockAlert.hidden = true;
-	}
 
 	cart = [];
 	deliveryToggle.checked = false;
@@ -1408,17 +1417,15 @@ function completePurchase(paymentMethod) {
 	deliveryFee = 0;
 	deliveryEstimate.hidden = true;
 	deliveryFields.hidden = true;
-	saveProducts();
 	if (paymentDetailsDialog.open) {
 		paymentDetailsDialog.close();
 	}
-	confirmButton.disabled = false;
 	checkoutDialog.close();
-	showFeedback(deliveryLocation
-		? "Compra confirmada. El delivery no se envió a un conductor; coordínalo directamente con la tienda."
-		: "Compra confirmada.");
+	confirmButton.disabled = false;
+	showFeedback("Pedido enviado a la tienda. Está pendiente de aceptación.");
 	renderCart();
 	renderProducts();
+	renderSales();
 }
 
 productForm.addEventListener("submit", (event) => {
@@ -1547,6 +1554,31 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 		});
 	});
 });
+salesStatusFilter.addEventListener("change", renderSales);
+salesOrdersList.addEventListener("click", (event) => {
+	const button = event.target.closest("[data-order-action]");
+	if (!button) {
+		return;
+	}
+	const nextStatus = {
+		accept: "accepted",
+		reject: "rejected",
+		complete: "completed"
+	}[button.dataset.orderAction];
+	if (nextStatus) {
+		updateOrderStatus(button.dataset.orderId, nextStatus);
+	}
+});
+window.addEventListener("storage", (event) => {
+	if (event.key === ORDER_STORAGE_KEY) {
+		orders = loadOrders();
+		renderSales();
+	} else if (event.key === STORAGE_KEY) {
+		products = loadProducts();
+		renderProducts();
+		renderCart();
+	}
+});
 deliveryToggle.addEventListener("change", () => {
 	deliveryFields.hidden = !deliveryToggle.checked;
 	deliveryFeedback.textContent = "";
@@ -1650,7 +1682,13 @@ document.querySelector("#admin-date").textContent = new Intl.DateTimeFormat("es"
 	month: "long",
 	year: "numeric"
 }).format(new Date()).toLocaleUpperCase("es");
+document.querySelector("#sales-date").textContent = new Intl.DateTimeFormat("es", {
+	day: "numeric",
+	month: "long",
+	year: "numeric"
+}).format(new Date()).toLocaleUpperCase("es");
 renderProducts();
 renderCart();
+renderSales();
 configureProductFormMode();
 loadDailyRate();
