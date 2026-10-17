@@ -1171,51 +1171,156 @@ function openMapPicker() {
 	mapPickerFeedback.textContent = mapPickerInput.value
 		? "Busca la dirección y marca el punto exacto en el mapa."
 		: "Busca una dirección o toca el mapa para colocar el pin.";
-	updateMapPicker();
 	mapPickerDialog.showModal();
+	void updateMapPicker();
 	window.setTimeout(() => {
 		if (mapPickerMap) {
-			mapPickerMap.invalidateSize({ pan: false });
 			const mapCenter = mapPickerCoordinates || DELIVERY_ORIGIN;
-			mapPickerMap.setView(
-				[mapCenter.latitude, mapCenter.longitude],
-				mapPickerCoordinates ? 16 : 12,
-				{ animate: false }
-			);
+			if (mapPickerProvider === "google") {
+				window.google.maps.event.trigger(mapPickerMap, "resize");
+				mapPickerMap.setCenter({ lat: mapCenter.latitude, lng: mapCenter.longitude });
+				mapPickerMap.setZoom(mapPickerCoordinates ? 16 : 12);
+			} else {
+				mapPickerMap.invalidateSize({ pan: false });
+				mapPickerMap.setView(
+					[mapCenter.latitude, mapCenter.longitude],
+					mapPickerCoordinates ? 16 : 12,
+					{ animate: false }
+				);
+			}
 			loadNearbyPlaces();
 		}
 	}, 100);
 }
 
-function updateMapPicker() {
-	if (!mapPickerMap) {
-		if (!window.L) {
-			mapPickerFeedback.textContent = "El mapa interactivo no está disponible. Revisa tu conexión y abre La Tiendita desde localhost o un sitio HTTPS.";
-			return;
+function loadGoogleMapsApi() {
+	if (window.google?.maps?.importLibrary) {
+		return Promise.resolve(window.google.maps);
+	}
+	if (!window.GOOGLE_MAPS_API_KEY) {
+		return Promise.reject(new Error("No hay una clave de Google Maps configurada."));
+	}
+	if (googleMapsApiPromise) {
+		return googleMapsApiPromise;
+	}
+	googleMapsApiPromise = new Promise((resolve, reject) => {
+		const callbackName = `laTienditaGoogleMapsLoaded${Date.now()}`;
+		const timeoutId = window.setTimeout(() => {
+			delete window[callbackName];
+			googleMapsApiPromise = null;
+			reject(new Error("Google Maps tardó demasiado en responder."));
+		}, 15000);
+		window[callbackName] = () => {
+			window.clearTimeout(timeoutId);
+			delete window[callbackName];
+			resolve(window.google.maps);
+		};
+		const script = document.createElement("script");
+		const scriptUrl = new URL("https://maps.googleapis.com/maps/api/js");
+		scriptUrl.searchParams.set("key", window.GOOGLE_MAPS_API_KEY);
+		scriptUrl.searchParams.set("v", "weekly");
+		scriptUrl.searchParams.set("loading", "async");
+		scriptUrl.searchParams.set("callback", callbackName);
+		script.addEventListener("error", () => {
+			window.clearTimeout(timeoutId);
+			delete window[callbackName];
+			googleMapsApiPromise = null;
+			reject(new Error("No se pudo cargar Google Maps."));
+		}, { once: true });
+		script.src = scriptUrl.href;
+		document.head.append(script);
+	});
+	return googleMapsApiPromise;
+}
+
+async function initializeGoogleMap() {
+	await loadGoogleMapsApi();
+	const [{ Map }, { Place }] = await Promise.all([
+		window.google.maps.importLibrary("maps"),
+		window.google.maps.importLibrary("places")
+	]);
+	const center = mapPickerCoordinates || DELIVERY_ORIGIN;
+	mapPickerMap = new Map(mapPickerMapElement, {
+		center: { lat: center.latitude, lng: center.longitude },
+		zoom: mapPickerCoordinates ? 16 : 12,
+		mapTypeControl: false,
+		streetViewControl: false,
+		fullscreenControl: false
+	});
+	mapPickerProvider = "google";
+	mapPickerMarker = new window.google.maps.Marker({
+		map: mapPickerCoordinates ? mapPickerMap : null,
+		position: { lat: center.latitude, lng: center.longitude },
+		draggable: true
+	});
+	mapPickerMarker.addListener("dragend", () => {
+		const position = mapPickerMarker.getPosition();
+		if (position) {
+			void setMapPickerSelection({ lat: position.lat(), lng: position.lng() }, true);
 		}
-		mapPickerMap = L.map(mapPickerMapElement, { scrollWheelZoom: true }).setView([DELIVERY_ORIGIN.latitude, DELIVERY_ORIGIN.longitude], 12);
-		const tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
-			maxZoom: 19,
-			attribution: "Tiles &copy; Esri"
-		}).addTo(mapPickerMap);
-		mapPlacesLayer = L.layerGroup().addTo(mapPickerMap);
-		mapPickerMap.on("moveend", scheduleNearbyPlacesSearch);
-		loadNearbyPlaces();
-		tileLayer.once("tileerror", () => {
-			mapPickerFeedback.textContent = "No se pudieron cargar las calles del mapa. Prueba de nuevo o busca la dirección y confirma el pin.";
-		});
-		mapPickerMap.on("click", (event) => setMapPickerSelection(event.latlng, true));
+	});
+	mapPickerMap.addListener("click", (event) => {
+		if (event.placeId) {
+			event.stop();
+			void selectGooglePlace(event.placeId);
+		} else if (event.latLng) {
+			void setMapPickerSelection({ lat: event.latLng.lat(), lng: event.latLng.lng() }, true);
+		}
+	});
+	mapPickerMap.addListener("idle", scheduleNearbyPlacesSearch);
+	mapBusinessFeedback.textContent = "Google Maps muestra los comercios y lugares registrados en esta zona.";
+}
+
+async function updateMapPicker() {
+	if (!mapPickerMap) {
+		if (window.GOOGLE_MAPS_API_KEY) {
+			try {
+				await initializeGoogleMap();
+			} catch (error) {
+				mapPickerFeedback.textContent = `Google Maps no está disponible: ${error.message} Se usará el mapa alternativo.`;
+			}
+		}
+		if (!mapPickerMap) {
+			if (!window.L) {
+				mapPickerFeedback.textContent = "El mapa interactivo no está disponible. Revisa tu conexión y abre La Tiendita desde localhost o un sitio HTTPS.";
+				return;
+			}
+			mapPickerMap = L.map(mapPickerMapElement, { scrollWheelZoom: true }).setView([DELIVERY_ORIGIN.latitude, DELIVERY_ORIGIN.longitude], 12);
+			mapPickerProvider = "leaflet";
+			const tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+				maxZoom: 19,
+				attribution: "Tiles &copy; Esri"
+			}).addTo(mapPickerMap);
+			mapPlacesLayer = L.layerGroup().addTo(mapPickerMap);
+			mapPickerMap.on("moveend", scheduleNearbyPlacesSearch);
+			loadNearbyPlaces();
+			tileLayer.once("tileerror", () => {
+				mapPickerFeedback.textContent = "No se pudieron cargar las calles del mapa. Prueba de nuevo o busca la dirección y confirma el pin.";
+			});
+			mapPickerMap.on("click", (event) => setMapPickerSelection(event.latlng, true));
+			if (!window.GOOGLE_MAPS_API_KEY) {
+				mapBusinessFeedback.textContent = "Sin clave de Google, se muestran los comercios disponibles en los datos abiertos.";
+			}
+		}
 	}
 	if (mapPickerCoordinates) {
-		mapPickerMap.setView([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], 16);
-		if (mapPickerMarker) {
-			mapPickerMarker.setLatLng([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude]);
+		if (mapPickerProvider === "google") {
+			const position = { lat: mapPickerCoordinates.latitude, lng: mapPickerCoordinates.longitude };
+			mapPickerMap.setCenter(position);
+			mapPickerMap.setZoom(16);
+			mapPickerMarker.setPosition(position);
+			mapPickerMarker.setMap(mapPickerMap);
 		} else {
-			mapPickerMarker = L.marker([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], { draggable: true }).addTo(mapPickerMap);
-			mapPickerMarker.on("dragend", () => setMapPickerSelection(mapPickerMarker.getLatLng(), true));
+			mapPickerMap.setView([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], 16);
+			if (mapPickerMarker) {
+				mapPickerMarker.setLatLng([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude]);
+			} else {
+				mapPickerMarker = L.marker([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], { draggable: true }).addTo(mapPickerMap);
+				mapPickerMarker.on("dragend", () => setMapPickerSelection(mapPickerMarker.getLatLng(), true));
+			}
 		}
 	} else if (mapPickerInput.value.trim()) {
-		searchMapLocation();
+		void searchMapLocation();
 	}
 	document.querySelector("#map-picker-selection-summary").textContent = mapPickerCoordinates
 		? "Punto marcado en el mapa"
@@ -1261,7 +1366,14 @@ function createBusinessPopup(feature) {
 }
 
 async function loadNearbyPlaces() {
-	if (!mapPickerMap || !mapPlacesLayer || mapPickerMap.getZoom() < 12) {
+	if (!mapPickerMap) {
+		return;
+	}
+	if (mapPickerProvider === "google") {
+		mapBusinessFeedback.textContent = "Google Maps muestra los comercios y lugares registrados en esta zona.";
+		return;
+	}
+	if (!mapPlacesLayer || mapPickerMap.getZoom() < 12) {
 		mapBusinessFeedback.textContent = "Acércate al mapa para ver comercios y servicios cercanos.";
 		return;
 	}
