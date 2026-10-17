@@ -62,6 +62,11 @@ h1 span { color: var(--green); }
 .stat-highlight .stat-value { color: var(--green); }
 .stat-rate .stat-value { color: #9a5948; font-size: 19px; }
 .stat-alert .stat-value { color: #ad6046; }
+.shopping-rate { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 13px; padding: 12px 17px; border: 1px solid #e7e4db; border-radius: 5px; background: rgba(255, 254, 250, .8); }
+.shopping-rate > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; }
+.shopping-rate-label { color: var(--muted); font-size: 10px; font-weight: 600; }
+.shopping-rate-value { color: #9a5948; font-size: 17px; font-weight: 700; }
+.shopping-rate .rate-source { flex: 0 0 auto; }
 .sales-intro { padding-bottom: 23px; }
 .sales-local-note { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 11px 14px; border: 1px solid #e5e8dc; border-radius: 5px; color: #68735f; background: #f5f7f0; font-size: 10px; line-height: 1.5; }
 .sales-local-note span { color: var(--green); font-size: 14px; }
@@ -503,6 +508,8 @@ h2 { color: #26332c; font-family: "DM Sans", sans-serif; font-size: 21px; font-w
 .stat-alert .stat-value, .stat-rate .stat-value { color: #a56142; }
 .stat-rate .stat-value { font-size: 17px; }
 .rate-source { margin-top: 1px; }
+.shopping-rate { margin-bottom: 15px; border-color: #e5eae6; border-radius: 10px; background: #fff; box-shadow: 0 5px 20px rgba(29, 48, 37, .035); }
+.shopping-rate-value { color: #a56142; }
 
 .inventory-panel, .form-panel, .cart-panel, .delivery-panel, .sales-orders-panel {
 	border: 1px solid #e5eae6;
@@ -647,6 +654,8 @@ td { border-color: #edf0ed; }
 	.stat-value { font-size: 18px; }
 	.stat-rate .stat-value { font-size: 15px; }
 	.rate-source { font-size: 8px; }
+	.shopping-rate { align-items: flex-start; flex-direction: column; gap: 6px; padding: 11px 13px; }
+	.shopping-rate-value { font-size: 16px; }
 	.page-footer { font-size: 9px; }
 }
 

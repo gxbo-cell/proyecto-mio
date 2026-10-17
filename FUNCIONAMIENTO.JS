@@ -241,6 +241,8 @@ async function loadDailyRate() {
 		} else {
 			document.querySelector("#daily-rate-value").textContent = "No disponible";
 			updatedLabel.textContent = "Conéctate para actualizar";
+			document.querySelector("#shopping-rate-value").textContent = "No disponible";
+			document.querySelector("#shopping-rate-updated").textContent = "Conéctate para actualizar";
 			renderProducts();
 			renderCart();
 		}
@@ -255,11 +257,14 @@ function renderExchangeRate(prefix = "Fecha valor · ") {
 		maximumFractionDigits: 4
 	}).format(exchangeRate.value);
 	document.querySelector("#daily-rate-value").textContent = `Bs ${formattedRate}`;
-	document.querySelector("#rate-updated").textContent = `${prefix}${new Intl.DateTimeFormat("es-VE", {
+	document.querySelector("#shopping-rate-value").textContent = `Bs ${formattedRate}`;
+	const updatedDate = `${prefix}${new Intl.DateTimeFormat("es-VE", {
 		day: "numeric",
 		month: "short",
 		year: "numeric"
 	}).format(new Date(exchangeRate.date))}`;
+	document.querySelector("#rate-updated").textContent = updatedDate;
+	document.querySelector("#shopping-rate-updated").textContent = updatedDate;
 }
 
 function saveProducts(showError = true) {
