@@ -231,6 +231,25 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 .driver-order-action { margin-top: 13px; }
 .driver-empty-state { min-height: 90px; }
 .driver-login-panel input { margin-bottom: 3px; }
+.driver-registration-dialog { width: min(790px, calc(100% - 30px)); max-width: 790px; max-height: min(90vh, 900px); padding: 25px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 80px rgba(25, 32, 24, .24); }
+.driver-registration-dialog::backdrop { background: rgba(29, 36, 29, .54); backdrop-filter: blur(2px); }
+.driver-registration-dialog form { display: grid; gap: 14px; }
+.driver-registration-dialog .dialog-heading { margin-bottom: 0; }
+.driver-registration-dialog .dialog-copy { margin: -8px 0 0; }
+.driver-registration-section { min-width: 0; margin: 0; padding: 13px 14px 15px; border: 1px solid var(--line); border-radius: 5px; }
+.driver-registration-section legend { padding: 0 6px; color: var(--green); font-size: 11px; font-weight: 700; }
+.driver-registration-grid, .driver-document-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 13px; }
+.driver-registration-grid > div, .driver-document-grid > div { min-width: 0; }
+.driver-registration-full { grid-column: 1 / -1; }
+.driver-registration-section input:not([type="checkbox"]) { width: 100%; }
+.driver-document-notice, .driver-registration-security { margin: 0; color: #62675e; font-size: 10px; line-height: 1.55; }
+.driver-document-grid input[type="file"] { min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 3px; background: #fffefa; font-size: 9px; }
+.driver-consent label { display: flex; align-items: flex-start; gap: 9px; color: #50564c; font-size: 10px; line-height: 1.55; cursor: pointer; }
+.driver-consent input { flex: 0 0 auto; margin-top: 2px; accent-color: var(--green); }
+.driver-registration-security { padding: 10px 12px; border-left: 3px solid var(--green); background: #f1f6f0; }
+.driver-registration-actions { margin-top: 0; }
+.driver-registration-actions button { min-height: 40px; }
+.driver-registration-status { margin: 7px 0 0; }
 
 .delivery-panel { padding: 19px 22px; border: 1px solid #e7e4db; border-radius: 5px; background: #f8f7f2; }
 .delivery-panel .eyebrow { margin-bottom: 5px; }
@@ -430,6 +449,11 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 	.view-switch-button { min-height: 30px; padding: 0 7px; font-size: 9px; }
 	.driver-orders-panel { padding: 16px 13px; }
 	.driver-orders-heading { align-items: center; }
+	.driver-registration-dialog { padding: 18px 15px; }
+	.driver-registration-grid, .driver-document-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+	.driver-registration-full { grid-column: auto; }
+	.driver-registration-actions { flex-direction: column-reverse; }
+	.driver-registration-actions button { width: 100%; }
 	.form-panel { padding: 20px; }
 	.cart-panel { padding: 18px 20px; }
 	.checkout-dialog { padding: 21px; }
