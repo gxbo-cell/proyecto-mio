@@ -1172,6 +1172,7 @@ function openMapPicker() {
 	window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
 		if (mapPickerMap) {
 			mapPickerMap.invalidateSize();
+			loadNearbyPlaces();
 		}
 	}));
 }
