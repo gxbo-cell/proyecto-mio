@@ -729,15 +729,6 @@ function openCheckout() {
 		openMapPickerButton.focus();
 		return;
 	}
-	if (deliveryToggle.checked && (!deliveryCustomerName.value.trim() || !deliveryCustomerPhone.value.trim())) {
-		deliveryFeedback.textContent = "Ingresa el nombre y teléfono de quien recibirá el pedido.";
-		(!deliveryCustomerName.value.trim() ? deliveryCustomerName : deliveryCustomerPhone).focus();
-		return;
-	}
-	if (deliveryToggle.checked && !isSupabaseConfigured()) {
-		deliveryFeedback.textContent = "Para enviar pedidos a conductores necesitas configurar Supabase. Revisa SUPABASE_SETUP.sql y la configuración al inicio de FUNCIONAMIENTO.JS.";
-		return;
-	}
 	if (deliveryToggle.checked && !deliveryAddress.value.trim()) {
 		deliveryFeedback.textContent = "Añade la dirección o una referencia para la entrega.";
 		deliveryAddress.focus();
@@ -753,7 +744,7 @@ function openCheckout() {
 	document.querySelector("#checkout-total-bs").textContent = formatBolivars(getOrderTotal());
 	checkoutDelivery.hidden = !deliveryToggle.checked;
 	checkoutDelivery.textContent = deliveryToggle.checked
-		? `Delivery · ${getDeliveryLocation()} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)}) · Esperando que un conductor acepte el pedido.`
+		? `Delivery · ${getDeliveryLocation()} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)}) · Coordina la entrega directamente con la tienda.`
 		: "";
 	checkoutDialog.showModal();
 }
