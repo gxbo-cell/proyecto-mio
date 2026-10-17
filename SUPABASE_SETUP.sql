@@ -90,17 +90,25 @@ as $$
 declare
 	new_order_id uuid;
 	items_subtotal numeric(12, 2);
+	delivery_distance_km double precision;
+	haversine_value double precision;
 begin
 	if p_tracking_code is null
 		or length(trim(coalesce(p_customer_name, ''))) not between 2 and 100
 		or length(trim(coalesce(p_customer_phone, ''))) not between 7 and 30
+		or p_items is null
 		or jsonb_typeof(p_items) <> 'array'
 		or jsonb_array_length(p_items) not between 1 and 80
+		or p_subtotal is null
 		or p_subtotal < 0
+		or p_delivery_fee is null
 		or p_delivery_fee < 0
 		or length(trim(coalesce(p_delivery_address, ''))) not between 3 and 1000
+		or p_delivery_latitude is null
 		or p_delivery_latitude not between -90 and 90
+		or p_delivery_longitude is null
 		or p_delivery_longitude not between -180 and 180
+		or p_payment_method is null
 		or p_payment_method not in ('Efectivo', 'Pago móvil', 'Transferencia') then
 		raise exception 'Los datos del pedido no son válidos.';
 	end if;
@@ -110,9 +118,11 @@ begin
 		from jsonb_to_recordset(p_items) as item(name text, quantity numeric, unit text, price_per_unit numeric, line_total numeric)
 		where length(trim(coalesce(item.name, ''))) not between 1 and 100
 			or item.quantity is null or item.quantity <= 0
-			or item.unit not in ('kg', 'unidad')
+			or item.unit is null or item.unit not in ('kg', 'unidad')
 			or item.price_per_unit is null or item.price_per_unit <= 0
 			or item.line_total is null or item.line_total < 0
+			or abs(item.line_total - item.quantity * item.price_per_unit *
+				case when item.price_per_unit > 50 then 0.9 else 1 end) > 0.000001
 	) then
 		raise exception 'Los productos incluidos en el pedido no son válidos.';
 	end if;
@@ -123,6 +133,15 @@ begin
 
 	if items_subtotal <> p_subtotal then
 		raise exception 'El subtotal no coincide con el detalle del pedido.';
+	end if;
+
+	haversine_value := sin(radians(p_delivery_latitude - 10.4806) / 2) ^ 2
+		+ cos(radians(10.4806)) * cos(radians(p_delivery_latitude))
+		* sin(radians(p_delivery_longitude + 66.9036) / 2) ^ 2;
+	haversine_value := least(1, greatest(0, haversine_value));
+	delivery_distance_km := 6371 * 2 * atan2(sqrt(haversine_value), sqrt(1 - haversine_value));
+	if p_delivery_fee <> greatest(1::numeric, ceil(delivery_distance_km / 5)::numeric) then
+		raise exception 'El costo de entrega no coincide con la ubicación seleccionada.';
 	end if;
 
 	insert into public.delivery_orders (
