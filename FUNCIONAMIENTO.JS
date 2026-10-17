@@ -2090,8 +2090,8 @@ mapPickerInput.addEventListener("input", () => {
 			mapPickerMarker.setMap(null);
 		} else {
 			mapPickerMap.removeLayer(mapPickerMarker);
+			mapPickerMarker = null;
 		}
-		mapPickerMarker = null;
 	}
 	window.clearTimeout(mapPickerSearchTimer);
 	if (mapPickerInput.value.trim().length >= 3) {
