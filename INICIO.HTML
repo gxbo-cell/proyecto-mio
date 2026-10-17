@@ -165,7 +165,7 @@
 				<section class="form-panel driver-login-panel" aria-labelledby="driver-login-title">
 					<p class="eyebrow">ACCESO DE CONDUCTOR</p>
 					<h2 id="driver-login-title">Iniciar sesión</h2>
-					<p class="panel-copy">Usa la cuenta de conductor que creó la tienda.</p>
+					<p class="panel-copy">Ingresa con tu cuenta o regístrate para comenzar a recibir pedidos.</p>
 					<form id="driver-login-form">
 						<label class="field-label" for="driver-email">Correo</label>
 						<input id="driver-email" type="email" autocomplete="username" required>
@@ -174,9 +174,12 @@
 						<button class="primary-button driver-login-button" type="submit">Entrar</button>
 						<p id="driver-login-feedback" class="form-feedback" role="status" aria-live="polite"></p>
 					</form>
+					<button id="open-driver-registration" class="secondary-button driver-login-button" type="button">Registrarme como conductor</button>
 					<div id="driver-session" hidden>
 						<p id="driver-session-name" class="driver-session-name"></p>
 						<p id="driver-session-vehicle" class="driver-session-vehicle"></p>
+						<p id="driver-registration-status" class="form-feedback" role="status" aria-live="polite"></p>
+						<button id="continue-driver-registration" class="secondary-button driver-login-button" type="button" hidden>Completar registro</button>
 						<button id="driver-logout" class="secondary-button driver-login-button" type="button">Cerrar sesión</button>
 					</div>
 				</section>
@@ -199,6 +202,78 @@
 				</div>
 			</div>
 		</section>
+
+		<dialog id="driver-registration-dialog" class="driver-registration-dialog" aria-labelledby="driver-registration-title">
+			<form id="driver-registration-form" enctype="multipart/form-data">
+				<div class="dialog-heading">
+					<div>
+						<p class="eyebrow">REGISTRO SEGURO DE CONDUCTOR</p>
+						<h2 id="driver-registration-title">Tu perfil de reparto</h2>
+					</div>
+					<button id="close-driver-registration" class="dialog-close" type="button" aria-label="Cerrar registro">×</button>
+				</div>
+				<p class="dialog-copy">Completa tus datos y adjunta documentos vigentes. El acceso a pedidos se habilita al completar la carga.</p>
+				<fieldset class="driver-registration-section">
+					<legend>Identidad y contacto</legend>
+					<div class="driver-registration-grid">
+						<div><label class="field-label" for="registration-full-name">Nombre y apellido</label><input id="registration-full-name" type="text" maxlength="100" autocomplete="name" required></div>
+						<div><label class="field-label" for="registration-national-id">Cédula de identidad</label><input id="registration-national-id" type="text" maxlength="24" autocomplete="off" placeholder="V-12345678" required></div>
+						<div><label class="field-label" for="registration-birth-date">Fecha de nacimiento</label><input id="registration-birth-date" type="date" autocomplete="bday" required></div>
+						<div><label class="field-label" for="registration-phone">Teléfono móvil</label><input id="registration-phone" type="tel" maxlength="30" autocomplete="tel" required></div>
+						<div class="driver-registration-full"><label class="field-label" for="registration-email">Correo electrónico</label><input id="registration-email" type="email" maxlength="254" autocomplete="email" required></div>
+					</div>
+				</fieldset>
+				<fieldset class="driver-registration-section">
+					<legend>Licencia de conducir</legend>
+					<div class="driver-registration-grid">
+						<div><label class="field-label" for="registration-license-number">Número de licencia</label><input id="registration-license-number" type="text" maxlength="40" autocomplete="off" required></div>
+						<div><label class="field-label" for="registration-license-class">Grado / clase</label><input id="registration-license-class" type="text" maxlength="40" placeholder="Ej. 3er grado" required></div>
+						<div><label class="field-label" for="registration-license-expiry">Vencimiento de licencia</label><input id="registration-license-expiry" type="date" required></div>
+					</div>
+				</fieldset>
+				<fieldset class="driver-registration-section">
+					<legend>Vehículo y cobertura</legend>
+					<div class="driver-registration-grid">
+						<div><label class="field-label" for="registration-plate">Placa</label><input id="registration-plate" type="text" maxlength="20" autocomplete="off" required></div>
+						<div><label class="field-label" for="registration-vehicle-make">Marca</label><input id="registration-vehicle-make" type="text" maxlength="50" required></div>
+						<div><label class="field-label" for="registration-vehicle-model">Modelo</label><input id="registration-vehicle-model" type="text" maxlength="50" required></div>
+						<div><label class="field-label" for="registration-vehicle-year">Año</label><input id="registration-vehicle-year" type="number" min="1980" max="2100" step="1" required></div>
+						<div><label class="field-label" for="registration-vehicle-color">Color</label><input id="registration-vehicle-color" type="text" maxlength="40" required></div>
+						<div><label class="field-label" for="registration-vehicle-registration">N.º de registro del vehículo</label><input id="registration-vehicle-registration" type="text" maxlength="60" required></div>
+						<div><label class="field-label" for="registration-insurance-company">Aseguradora</label><input id="registration-insurance-company" type="text" maxlength="100" required></div>
+						<div><label class="field-label" for="registration-insurance-policy">N.º de póliza</label><input id="registration-insurance-policy" type="text" maxlength="60" required></div>
+						<div><label class="field-label" for="registration-insurance-expiry">Vencimiento del seguro</label><input id="registration-insurance-expiry" type="date" required></div>
+					</div>
+				</fieldset>
+				<fieldset class="driver-registration-section">
+					<legend>Contacto de emergencia</legend>
+					<div class="driver-registration-grid">
+						<div><label class="field-label" for="registration-emergency-name">Nombre y apellido</label><input id="registration-emergency-name" type="text" maxlength="100" required></div>
+						<div><label class="field-label" for="registration-emergency-phone">Teléfono</label><input id="registration-emergency-phone" type="tel" maxlength="30" required></div>
+					</div>
+				</fieldset>
+				<fieldset class="driver-registration-section">
+					<legend>Documentos obligatorios</legend>
+					<p class="driver-document-notice">Sube imágenes claras o PDF (máximo 8 MB cada uno). Los documentos se guardan en un espacio privado de Supabase; no se muestran a clientes ni a otros conductores.</p>
+					<div class="driver-document-grid">
+						<div><label class="field-label" for="registration-document-id">Cédula (anverso y reverso en un archivo)</label><input id="registration-document-id" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
+						<div><label class="field-label" for="registration-document-license">Licencia de conducir</label><input id="registration-document-license" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
+						<div><label class="field-label" for="registration-document-vehicle">Registro / propiedad del vehículo</label><input id="registration-document-vehicle" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
+						<div><label class="field-label" for="registration-document-insurance">Póliza o constancia de seguro vigente</label><input id="registration-document-insurance" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></div>
+					</div>
+				</fieldset>
+				<fieldset class="driver-registration-section driver-consent">
+					<legend>Confirmación</legend>
+					<label><input id="registration-consent" type="checkbox" required> Confirmo que soy mayor de 18 años, los datos son verdaderos y autorizo a la tienda a verificar y conservar esta información y documentación para habilitar y gestionar los repartos.</label>
+				</fieldset>
+				<p class="driver-registration-security">No envíes estos documentos por chat. El formulario no los guarda en el navegador. El registro habilita el acceso automáticamente cuando todos los documentos se hayan cargado correctamente.</p>
+				<p id="driver-registration-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+				<div class="dialog-actions driver-registration-actions">
+					<button class="secondary-button" type="button" id="cancel-driver-registration">Cancelar</button>
+					<button class="primary-button" type="submit">Crear cuenta y enviar documentos</button>
+				</div>
+			</form>
+		</dialog>
 
 		<section id="admin-view" class="app-view" aria-labelledby="admin-title" hidden>
 			<section class="intro admin-intro">
