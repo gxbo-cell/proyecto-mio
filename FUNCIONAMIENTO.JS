@@ -1076,10 +1076,11 @@ function getValidatedMapLink() {
 	try {
 		const url = new URL(value);
 		const hostname = url.hostname.toLowerCase();
-		const isGoogleMaps = hostname === "maps.app.goo.gl" ||
-			hostname === "goo.gl" ||
-			hostname === "maps.google.com" ||
-			(hostname === "google.com" || hostname === "www.google.com") && url.pathname.startsWith("/maps");
+		const isShortGoogleMapsLink = hostname === "maps.app.goo.gl" ||
+			hostname === "goo.gl" && url.pathname.startsWith("/maps");
+		const isRegionalGoogleMapsLink = /^(?:(?:www\.)?google|maps\.google)\.(?:com(?:\.[a-z]{2})?|[a-z]{2,3}(?:\.[a-z]{2})?)$/.test(hostname) &&
+			url.pathname.startsWith("/maps");
+		const isGoogleMaps = isShortGoogleMapsLink || isRegionalGoogleMapsLink;
 		return url.protocol === "https:" && isGoogleMaps ? url.href : "";
 	} catch {
 		return "";
@@ -1113,7 +1114,7 @@ function getCoordinatesFromMapLink(mapLink) {
 	const patterns = [
 		/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
 		/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
-		/[?&](?:query|q)=(-?\d+(?:\.\d+)?)(?:%2C|,|\s)+(-?\d+(?:\.\d+)?)/
+		/[?&](?:query|q)=(-?\d+(?:\.\d+)?)(?:%2c|,|\s)+(-?\d+(?:\.\d+)?)/i
 	];
 	for (const pattern of patterns) {
 		const match = mapLink.match(pattern);
