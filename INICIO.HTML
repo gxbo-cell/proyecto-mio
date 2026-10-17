@@ -21,7 +21,8 @@
 		</a>
 		<nav class="view-switch" aria-label="Secciones de la tienda">
 			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true">Compras</button>
-			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Administración</button>
+			<button class="view-switch-button" type="button" data-view-target="sales-view" aria-pressed="false">Ventas <span id="pending-order-count" class="nav-badge" hidden>0</span></button>
+			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Inventario</button>
 		</nav>
 	</header>
 
@@ -120,6 +121,44 @@
 				</section>
 			</aside>
 			</div>
+		</section>
+
+		<section id="sales-view" class="app-view" aria-labelledby="sales-title" hidden>
+			<section class="intro sales-intro">
+				<div>
+					<p class="eyebrow">OPERACIÓN DE LA TIENDA <span>·</span> <span id="sales-date"></span></p>
+					<h1 id="sales-title">Pedidos y<br><span>ventas.</span></h1>
+				</div>
+				<p class="intro-copy">Revisa cada pedido, acepta las compras y mantén tus ventas organizadas.</p>
+			</section>
+			<p class="sales-local-note"><span aria-hidden="true">ⓘ</span> Los pedidos se guardan en este navegador y no se comparten con otros dispositivos.</p>
+			<section class="sales-stats" aria-label="Resumen de pedidos y ventas">
+				<article class="sales-stat sales-stat-pending"><span class="sales-stat-icon" aria-hidden="true">◷</span><span class="sales-stat-label">Por aceptar</span><strong id="sales-pending-count" class="sales-stat-value">0</strong></article>
+				<article class="sales-stat"><span class="sales-stat-icon" aria-hidden="true">✓</span><span class="sales-stat-label">En preparación</span><strong id="sales-accepted-count" class="sales-stat-value">0</strong></article>
+				<article class="sales-stat"><span class="sales-stat-icon" aria-hidden="true">$</span><span class="sales-stat-label">Ventas completadas</span><strong id="sales-completed-count" class="sales-stat-value">0</strong></article>
+				<article class="sales-stat sales-stat-revenue"><span class="sales-stat-icon" aria-hidden="true">↗</span><span class="sales-stat-label">Ingresos confirmados</span><strong id="sales-revenue" class="sales-stat-value">$0.00</strong></article>
+			</section>
+			<section class="sales-orders-panel" aria-labelledby="sales-orders-title">
+				<div class="sales-orders-heading">
+					<div><p class="eyebrow">CENTRO DE PEDIDOS</p><h2 id="sales-orders-title">Todas las órdenes</h2></div>
+					<label class="sales-filter-wrap" for="sales-status-filter"><span>Ver</span>
+						<select id="sales-status-filter" class="sales-status-filter">
+							<option value="all">Todos los pedidos</option>
+							<option value="pending">Por aceptar</option>
+							<option value="accepted">En preparación</option>
+							<option value="completed">Completados</option>
+							<option value="rejected">Rechazados</option>
+						</select>
+					</label>
+				</div>
+				<p id="sales-feedback" class="sales-feedback" role="status" aria-live="polite"></p>
+				<div id="sales-orders-list" class="sales-orders-list"></div>
+				<div id="sales-empty-state" class="sales-empty-state">
+					<span class="sales-empty-icon" aria-hidden="true">▤</span>
+					<strong>Aún no hay pedidos</strong>
+					<span>Cuando se confirme una compra, aparecerá aquí para que puedas gestionarla.</span>
+				</div>
+			</section>
 		</section>
 
 		<section id="admin-view" class="app-view" aria-labelledby="admin-title" hidden>
