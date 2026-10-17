@@ -200,7 +200,8 @@
 								<div><label class="field-label" for="product-stock">Cantidad inicial</label><input id="product-stock" name="stock" type="number" min="0" step="1" placeholder="0" required></div>
 							</div>
 							<p class="discount-note"><span aria-hidden="true">↘</span> 10% de descuento automático en precios mayores a $50.</p>
-							<button class="primary-button" type="submit"><span aria-hidden="true">＋</span> Agregar al inventario</button>
+							<button id="submit-product-button" class="primary-button" type="submit"><span aria-hidden="true">＋</span> Agregar al inventario</button>
+							<button id="cancel-edit-button" class="secondary-button cancel-edit-button" type="button" hidden>Cancelar edición</button>
 							<p id="form-feedback" class="form-feedback" role="status" aria-live="polite"></p>
 						</form>
 					</section>
