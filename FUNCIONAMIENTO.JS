@@ -892,7 +892,7 @@ function confirmProductDeletion() {
 	if (!product) {
 		return;
 	}
-	if (editingProductId === productId) {
+	if (editingProductId === product.id) {
 		cancelProductEdit();
 	}
 	products = products.filter((item) => item.id !== product.id);
