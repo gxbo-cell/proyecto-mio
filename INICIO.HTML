@@ -338,6 +338,21 @@
 				<button id="confirm-map-location" class="primary-button" type="button">Usar esta ubicación</button>
 			</div>
 		</dialog>
+
+		<dialog id="delete-confirm-dialog" class="delete-confirm-dialog" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description">
+			<div class="delete-confirm-header">
+				<span class="delete-confirm-icon" aria-hidden="true">!</span>
+				<div>
+					<p class="eyebrow">CONFIRMAR ACCIÓN</p>
+					<h2 id="delete-confirm-title">Eliminar producto</h2>
+				</div>
+			</div>
+			<p id="delete-confirm-description" class="delete-confirm-copy">¿Quieres eliminar <strong id="delete-confirm-product-name"></strong> del inventario? También se quitará del carrito.</p>
+			<div class="delete-confirm-actions">
+				<button id="cancel-delete-product" class="secondary-button" type="button">Conservar producto</button>
+				<button id="confirm-delete-product" class="destructive-button" type="button">Eliminar producto</button>
+			</div>
+		</dialog>
 		<footer class="page-footer"><span>La Tiendita <span class="brand-period">·</span> Inventario sencillo, tienda en orden.</span><span>Los precios mayores a $50 reciben 10% de descuento.</span></footer>
 	</main>
 </body>

@@ -62,6 +62,8 @@ const cartTotal = document.querySelector("#cart-total");
 const cartDeliveryLine = document.querySelector("#cart-delivery-line");
 const checkoutButton = document.querySelector("#checkout-button");
 const checkoutDialog = document.querySelector("#checkout-dialog");
+const deleteConfirmDialog = document.querySelector("#delete-confirm-dialog");
+const deleteConfirmProductName = document.querySelector("#delete-confirm-product-name");
 const paymentDetailsDialog = document.querySelector("#payment-details-dialog");
 const checkoutForm = document.querySelector("#checkout-form");
 const checkoutTotal = document.querySelector("#checkout-total");
@@ -118,6 +120,7 @@ let googleAutocompleteSessionToken = null;
 let deliveryFee = 0;
 let activeCategory = "Todos";
 let editingProductId = null;
+let pendingDeleteProductId = null;
 let isSuggestingProductCategory = false;
 let lastSuggestedProductCategory = null;
 
@@ -874,14 +877,26 @@ function updateProductStock(productId, requestedStock) {
 
 function deleteProduct(productId) {
 	const product = products.find((item) => item.id === productId);
-	if (!product || !window.confirm(`¿Eliminar "${product.name}" del inventario?`)) {
+	if (!product) {
+		return;
+	}
+	pendingDeleteProductId = productId;
+	deleteConfirmProductName.textContent = `“${product.name}”`;
+	deleteConfirmDialog.showModal();
+}
+
+function confirmProductDeletion() {
+	const product = products.find((item) => item.id === pendingDeleteProductId);
+	pendingDeleteProductId = null;
+	deleteConfirmDialog.close();
+	if (!product) {
 		return;
 	}
 	if (editingProductId === productId) {
 		cancelProductEdit();
 	}
-	products = products.filter((item) => item.id !== productId);
-	cart = cart.filter((item) => item.productId !== productId);
+	products = products.filter((item) => item.id !== product.id);
+	cart = cart.filter((item) => item.productId !== product.id);
 	saveProducts();
 	showFeedback(`${product.name} fue eliminado del inventario.`);
 	renderProducts();
