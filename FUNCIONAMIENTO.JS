@@ -860,7 +860,7 @@ function updateProductStock(productId, requestedStock) {
 			: "La existencia debe ser un número entero igual o mayor que cero.", true);
 		return;
 	}
-	if (editingProductId === productId) {
+	if (editingProductId === product.id) {
 		cancelProductEdit();
 	}
 	product.stock = stock;
@@ -2153,6 +2153,16 @@ document.querySelector("#confirm-map-location").addEventListener("click", select
 document.querySelector("#close-map-picker").addEventListener("click", () => mapPickerDialog.close());
 document.querySelector("#cancel-map-picker").addEventListener("click", () => mapPickerDialog.close());
 checkoutButton.addEventListener("click", openCheckout);
+document.querySelector("#cancel-delete-product").addEventListener("click", () => deleteConfirmDialog.close());
+document.querySelector("#confirm-delete-product").addEventListener("click", confirmProductDeletion);
+deleteConfirmDialog.addEventListener("close", () => {
+	pendingDeleteProductId = null;
+});
+deleteConfirmDialog.addEventListener("click", (event) => {
+	if (event.target === deleteConfirmDialog) {
+		deleteConfirmDialog.close();
+	}
+});
 document.querySelector("#close-checkout").addEventListener("click", () => checkoutDialog.close());
 document.querySelector("#cancel-checkout").addEventListener("click", () => checkoutDialog.close());
 checkoutForm.addEventListener("submit", (event) => {
