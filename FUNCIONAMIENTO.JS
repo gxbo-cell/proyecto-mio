@@ -658,7 +658,10 @@ function createOrderReviewForm(order) {
 	form.dataset.orderId = order.id;
 
 	const heading = document.createElement("h3");
-	heading.textContent = order.review ? "Tu reseña" : "¿Cómo fue tu experiencia?";
+	heading.textContent = "¿Cómo fue tu experiencia?";
+	const introduction = document.createElement("p");
+	introduction.className = "purchase-review-form-intro";
+	introduction.textContent = "Cada estrella que nos regalas nos ayuda a crecer. ¡Gracias por elegir La Tiendita!";
 	const ratingFieldset = document.createElement("fieldset");
 	ratingFieldset.className = "sales-review-rating";
 	const ratingLegend = document.createElement("legend");
@@ -701,8 +704,30 @@ function createOrderReviewForm(order) {
 	submit.className = "primary-button";
 	submit.type = "submit";
 	submit.textContent = order.review ? "Actualizar reseña" : "Guardar reseña";
-	form.append(heading, ratingFieldset, reasonLabel, submit);
+	form.append(heading, introduction, ratingFieldset, reasonLabel, submit);
 	return form;
+}
+
+function createSavedReviewMessage(review) {
+	const message = document.createElement("div");
+	message.className = "purchase-review-saved";
+	const stars = document.createElement("div");
+	stars.className = "purchase-review-saved-stars";
+	stars.setAttribute("aria-label", `Calificación: ${review.rating} de 5 estrellas`);
+	for (let rating = 1; rating <= 5; rating += 1) {
+		const star = document.createElement("span");
+		star.setAttribute("aria-hidden", "true");
+		star.textContent = "★";
+		if (rating <= review.rating) {
+			star.classList.add("selected");
+		}
+		stars.append(star);
+	}
+	const thankYou = document.createElement("p");
+	thankYou.className = "purchase-review-thank-you";
+	thankYou.textContent = "¡Muchas gracias por compartir tu experiencia! Tu opinión hace crecer a La Tiendita.";
+	message.append(stars, thankYou);
+	return message;
 }
 
 function renderShoppingReviewSummary() {
@@ -745,7 +770,9 @@ function renderPurchaseReviews(orderId) {
 		status.textContent = order.review ? "Reseñado" : getOrderStatusLabel(order.status);
 		header.append(heading, status);
 		card.append(header);
-		if (order.receivedConfirmed || order.review) {
+		if (order.review) {
+			card.append(createSavedReviewMessage(order.review));
+		} else if (order.receivedConfirmed) {
 			card.append(createOrderReviewForm(order));
 		} else {
 			const prompt = document.createElement("div");
@@ -2240,7 +2267,7 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		return;
 	}
 	const order = orders.find((entry) => entry.id === form.dataset.orderId);
-	if (!order || order.status === "rejected" || !order.receivedConfirmed) {
+	if (!order || order.status === "rejected" || !order.receivedConfirmed || order.review) {
 		purchaseReviewsFeedback.textContent = "Confirma primero que recibiste el pedido para poder reseñarlo.";
 		return;
 	}
@@ -2250,23 +2277,17 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		purchaseReviewsFeedback.textContent = "Selecciona de 1 a 5 estrellas y explica las calificaciones de 1 o 2 estrellas.";
 		return;
 	}
-	const previousReview = order.review;
 	order.review = {
 		rating,
 		reason: rating <= 2 ? reason : ""
 	};
 	if (!saveOrders()) {
-		if (previousReview) {
-			order.review = previousReview;
-		} else {
-			delete order.review;
-		}
+		delete order.review;
 		purchaseReviewsFeedback.textContent = "No se pudo guardar la reseña en este navegador. Inténtalo de nuevo.";
 		return;
 	}
-	purchaseReviewsFeedback.textContent = `Reseña de ${getOrderDisplayId(order)} guardada. Gracias por compartir tu experiencia.`;
 	renderShoppingReviewSummary();
-	renderPurchaseReviews(order.id);
+	purchaseReviewDialog.close();
 });
 window.addEventListener("storage", (event) => {
 	if (event.key === ORDER_STORAGE_KEY) {
