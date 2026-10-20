@@ -646,6 +646,10 @@ function getOrderStatusLabel(status) {
 	}[status] || "Pedido";
 }
 
+function getLocalDateInputValue(date) {
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function createOrderReviewForm(order) {
 	const form = document.createElement("form");
 	form.className = "sales-order-review";
@@ -661,8 +665,8 @@ function createOrderReviewForm(order) {
 	dateInput.className = "sales-review-date";
 	dateInput.type = "date";
 	dateInput.name = "receivedAt";
-	const today = new Date();
-	dateInput.max = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+	dateInput.min = getLocalDateInputValue(new Date(order.createdAt));
+	dateInput.max = getLocalDateInputValue(new Date());
 	dateInput.value = order.review?.receivedAt || "";
 	dateInput.required = true;
 	dateLabel.append(dateInput);
