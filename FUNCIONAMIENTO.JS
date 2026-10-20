@@ -2270,6 +2270,9 @@ document.querySelector("#category-filters").addEventListener("click", (event) =>
 });
 document.querySelectorAll(".view-switch-button").forEach((button) => {
 	button.addEventListener("click", () => {
+		if (button.dataset.viewTarget !== "shopping-view" && !isStoreAdmin) {
+			return;
+		}
 		document.querySelectorAll(".view-switch-button").forEach((viewButton) => {
 			const isActive = viewButton === button;
 			viewButton.classList.toggle("active", isActive);
@@ -2282,6 +2285,7 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 });
 document.querySelector("#close-purchase-review").addEventListener("click", () => {
 	purchaseReviewDialog.close();
+	activeReviewOrderId = null;
 });
 purchaseReviewDialog.addEventListener("click", (event) => {
 	if (event.target === purchaseReviewDialog) {
@@ -2327,21 +2331,24 @@ purchaseReviewsList.addEventListener("click", (event) => {
 		purchaseReviewsFeedback.textContent = "No se puede confirmar la recepción de este pedido.";
 		return;
 	}
-	const previousValue = order.receivedConfirmed;
-	order.receivedConfirmed = true;
-	if (!saveOrders()) {
-		if (previousValue === undefined) {
-			delete order.receivedConfirmed;
-		} else {
-			order.receivedConfirmed = previousValue;
+	button.disabled = true;
+	supabaseClient.rpc("confirm_store_order_received", { p_order_id: order.id }).then(({ data, error }) => {
+		button.disabled = false;
+		if (error) {
+			purchaseReviewsFeedback.textContent = `No se pudo confirmar la recepción: ${getBackendError(error)}`;
+			return;
 		}
-		purchaseReviewsFeedback.textContent = "No se pudo guardar la confirmación en este navegador. Inténtalo de nuevo.";
-		return;
-	}
-	purchaseReviewsFeedback.textContent = "¡Gracias! Ahora cuéntanos cómo fue tu experiencia.";
-	renderPurchaseReviews(order.id);
+		const updatedOrder = mapOrder(data);
+		orders = orders.map((entry) => entry.id === updatedOrder.id ? updatedOrder : entry);
+		purchaseReviewsFeedback.textContent = "¡Gracias! Ahora cuéntanos cómo fue tu experiencia.";
+		renderPurchaseReviews(order.id);
+	}).catch((error) => {
+		button.disabled = false;
+		purchaseReviewsFeedback.textContent = `No se pudo confirmar la recepción: ${getBackendError(error)}`;
+	});
+	return;
 });
-purchaseReviewsList.addEventListener("submit", (event) => {
+purchaseReviewsList.addEventListener("submit", async (event) => {
 	const form = event.target.closest("[data-order-review]");
 	if (!form) {
 		return;
@@ -2365,28 +2372,22 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		purchaseReviewsFeedback.textContent = "Elige una carita y explica las 2 calificaciones más negativas.";
 		return;
 	}
-	order.review = {
-		rating,
-		reason: rating <= 2 ? reason : ""
-	};
-	if (!saveOrders()) {
-		delete order.review;
-		purchaseReviewsFeedback.textContent = "No se pudo guardar la reseña en este navegador. Inténtalo de nuevo.";
+	const submitButton = form.querySelector('button[type="submit"]');
+	submitButton.disabled = true;
+	const { data, error } = await supabaseClient.rpc("submit_store_order_review", {
+		p_order_id: order.id,
+		p_rating: rating,
+		p_reason: reason
+	});
+	submitButton.disabled = false;
+	if (error) {
+		purchaseReviewsFeedback.textContent = `No se pudo guardar la reseña: ${getBackendError(error)}`;
 		return;
 	}
+	const updatedOrder = mapOrder(data);
+	orders = orders.map((entry) => entry.id === updatedOrder.id ? updatedOrder : entry);
 	renderShoppingReviewSummary();
 	purchaseReviewDialog.close();
-});
-window.addEventListener("storage", (event) => {
-	if (event.key === ORDER_STORAGE_KEY) {
-		orders = loadOrders();
-		renderSales();
-		renderShoppingReviewSummary();
-	} else if (event.key === STORAGE_KEY) {
-		products = loadProducts();
-		renderProducts();
-		renderCart();
-	}
 });
 deliveryToggle.addEventListener("change", () => {
 	deliveryFields.hidden = !deliveryToggle.checked;
