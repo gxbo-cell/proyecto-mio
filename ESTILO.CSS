@@ -105,9 +105,6 @@ h1 span { color: var(--green); }
 .sales-order-item-name { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .sales-order-item-copy small { color: var(--muted); font-size: 9px; }
 .sales-order-address { margin: 10px 0 0; color: #697166; font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
-.reviews-summary-button { position: fixed; z-index: 25; right: 22px; bottom: 20px; min-height: 48px; display: inline-flex; align-items: center; gap: 10px; padding: 0 16px; border: 1px solid #e8d9b2; border-radius: 28px; color: #3f493f; background: #fffefa; box-shadow: 0 8px 26px rgba(34, 37, 31, .16); font: 600 11px "DM Sans", sans-serif; transition: transform .15s ease, box-shadow .15s ease; }
-.reviews-summary-button:hover { transform: translateY(-2px); box-shadow: 0 11px 30px rgba(34, 37, 31, .2); }
-.reviews-summary-button:focus-visible { outline: 3px solid rgba(39, 116, 81, .3); outline-offset: 3px; }
 .reviews-summary-stars { color: #e6a83f; font-size: 14px; letter-spacing: 1px; white-space: nowrap; }
 .purchase-review-dialog { width: min(560px, calc(100% - 32px)); max-width: none; max-height: min(84vh, 760px); padding: 25px; overflow-y: auto; border: 1px solid #e3e9e4; border-radius: 16px; color: var(--ink); background: #fffefa; box-shadow: 0 22px 70px rgba(27, 34, 28, .25); }
 .purchase-review-dialog::backdrop { background: rgba(28, 35, 30, .52); backdrop-filter: blur(3px); }
@@ -117,9 +114,6 @@ h1 span { color: var(--green); }
 .purchase-review-dialog-heading .eyebrow { margin-bottom: 4px; color: #78827b; letter-spacing: .8px; }
 .purchase-review-dialog-heading h2 { color: #26332c; font-family: "DM Sans", sans-serif; font-size: 21px; font-weight: 700; letter-spacing: -.4px; }
 .purchase-review-dialog-intro { margin: 15px 0; color: #69766d; font-size: 12px; line-height: 1.6; }
-.reviews-dialog-summary { display: flex; align-items: center; gap: 9px; margin-bottom: 15px; padding: 12px 14px; border: 1px solid #f0e7d1; border-radius: 9px; background: #fffcf5; }
-.reviews-dialog-summary > strong { color: #28362e; font-size: 20px; }
-.reviews-dialog-summary > span:last-child { margin-left: auto; color: #727b73; font-size: 10px; }
 .purchase-reviews-list { display: grid; gap: 12px; }
 .purchase-reviews-empty { margin: 0; padding: 20px; border: 1px dashed #dce5de; border-radius: 9px; color: #78827b; font-size: 11px; text-align: center; }
 .purchase-review-card { padding: 20px; border-color: #e5eae6; border-left: 4px solid #4f9567; }
@@ -701,11 +695,8 @@ td { border-color: #edf0ed; }
 	.sales-order-id { font-size: 12px; }
 	.sales-order-time { font-size: 9px; }
 	.sales-order-status { padding: 5px 8px; font-size: 9px; }
-	.reviews-summary-button { right: 10px; bottom: 10px; min-height: 43px; gap: 7px; padding: 0 12px; font-size: 10px; }
 	.purchase-review-dialog { padding: 18px 14px; border-radius: 12px; }
 	.purchase-review-dialog-heading h2 { font-size: 19px; }
-	.reviews-dialog-summary { gap: 6px; padding: 10px; }
-	.reviews-dialog-summary > span:last-child { font-size: 9px; text-align: right; }
 	.purchase-review-card { padding: 15px 12px 13px; }
 	.purchase-received-prompt { align-items: stretch; flex-direction: column; gap: 12px; padding: 14px; }
 	.purchase-received-prompt p { font-size: 11px; }
