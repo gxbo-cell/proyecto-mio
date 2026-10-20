@@ -135,6 +135,8 @@ begin
 
 	if p_delivery is not null then
 		if nullif(trim(p_delivery->>'location'), '') is null
+			or (p_delivery->>'latitude') is null
+			or (p_delivery->>'longitude') is null
 			or (p_delivery->>'latitude') !~ '^-?[0-9]+(\.[0-9]+)?$'
 			or (p_delivery->>'longitude') !~ '^-?[0-9]+(\.[0-9]+)?$' then
 			raise exception 'La ubicación de delivery no es válida.';
@@ -144,11 +146,11 @@ begin
 		if v_latitude not between -90 and 90 or v_longitude not between -180 and 180 then
 			raise exception 'Las coordenadas de delivery no son válidas.';
 		end if;
-		v_distance_km := 6371 * 2 * asin(sqrt(
+		v_distance_km := 6371 * 2 * asin(sqrt(least(1, greatest(0,
 			power(sin(radians(v_latitude - 10.4806) / 2), 2) +
 			cos(radians(10.4806)) * cos(radians(v_latitude)) *
 			power(sin(radians(v_longitude - (-66.9036)) / 2), 2)
-		));
+		)));
 		v_zone := greatest(1, ceil(v_distance_km / 5)::integer);
 		v_delivery := jsonb_build_object(
 			'location', trim(p_delivery->>'location'),
@@ -301,26 +303,6 @@ grant execute on function public.place_store_order(jsonb, text, jsonb) to authen
 grant execute on function public.confirm_store_order_received(uuid) to authenticated;
 grant execute on function public.submit_store_order_review(uuid, integer, text) to authenticated;
 grant execute on function public.admin_update_store_order_status(uuid, text) to authenticated;
-
-create or replace function public.touch_order_review()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-	if new.review_rating is distinct from old.review_rating
-		or new.review_reason is distinct from old.review_reason
-		or new.received_confirmed is distinct from old.received_confirmed then
-		raise exception 'Las reseñas y confirmaciones se gestionan mediante funciones seguras.';
-	end if;
-	return new;
-end;
-$$;
-
-drop trigger if exists protect_order_customer_fields on public.orders;
-create trigger protect_order_customer_fields
-	before update on public.orders
-	for each row execute function public.touch_order_review();
 
 do $$
 begin
