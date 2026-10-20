@@ -67,10 +67,6 @@ h1 span { color: var(--green); }
 .stat-rate .stat-value { color: #9a5948; font-size: 19px; }
 .stat-alert .stat-value { color: #ad6046; }
 .shopping-rate { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 13px; padding: 12px 17px; border: 1px solid #e7e4db; border-radius: 5px; background: rgba(255, 254, 250, .8); }
-.shopping-reviews-summary { width: fit-content; display: flex; align-items: center; gap: 9px; margin: 0 0 12px auto; padding: 9px 13px; border: 1px solid #eee7d7; border-radius: 24px; color: #667168; background: #fffefa; box-shadow: 0 3px 10px rgba(29, 48, 37, .035); font-size: 10px; }
-.shopping-reviews-icon { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 50%; color: #a36e15; background: #fff3d8; font-size: 12px; }
-.shopping-reviews-summary strong { color: #29372e; font-size: 13px; }
-.shopping-reviews-stars { color: #e6a83f; letter-spacing: 1px; }
 .shopping-rate > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; }
 .shopping-rate-label { color: var(--muted); font-size: 10px; font-weight: 600; }
 .shopping-rate-value { color: #9a5948; font-size: 17px; font-weight: 700; }
