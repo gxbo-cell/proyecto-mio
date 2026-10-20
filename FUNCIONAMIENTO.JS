@@ -729,6 +729,7 @@ function renderPurchaseReviews() {
 	for (const order of reviewableOrders) {
 		const card = document.createElement("article");
 		card.className = "sales-order-card purchase-review-card";
+		card.dataset.orderId = order.id;
 		const header = document.createElement("div");
 		header.className = "sales-order-header";
 		const heading = document.createElement("div");
@@ -912,10 +913,7 @@ function openPurchaseReviewDialog(orderId = "") {
 	purchaseReviewsFeedback.textContent = "";
 	renderPurchaseReviews();
 	if (orderId) {
-		const orderCard = [...purchaseReviewsList.children].find((card) =>
-			card.querySelector(`[data-order-id="${CSS.escape(orderId)}"]`) ||
-			card.querySelector(`[data-received-order-id="${CSS.escape(orderId)}"]`)
-		);
+		const orderCard = [...purchaseReviewsList.children].find((card) => card.dataset.orderId === orderId);
 		orderCard?.scrollIntoView({ block: "nearest" });
 	}
 	if (!purchaseReviewDialog.open) {
@@ -2059,6 +2057,7 @@ function completePurchase(paymentMethod) {
 	renderCart();
 	renderProducts();
 	renderSales();
+	openPurchaseReviewDialog(order.id);
 }
 
 productForm.addEventListener("submit", (event) => {
@@ -2194,6 +2193,12 @@ document.querySelectorAll(".view-switch-button").forEach((button) => {
 		});
 	});
 });
+document.querySelector("#reviews-summary-button").addEventListener("click", () => {
+	openPurchaseReviewDialog();
+});
+document.querySelector("#close-purchase-review").addEventListener("click", () => {
+	purchaseReviewDialog.close();
+});
 salesStatusFilter.addEventListener("change", renderSales);
 salesOrdersList.addEventListener("click", (event) => {
 	const button = event.target.closest("[data-order-action]");
@@ -2229,8 +2234,8 @@ purchaseReviewsList.addEventListener("click", (event) => {
 		return;
 	}
 	const order = orders.find((entry) => entry.id === button.dataset.receivedOrderId);
-	if (!order || order.status !== "completed") {
-		purchaseReviewsFeedback.textContent = "Solo puedes confirmar la recepción de un pedido completado.";
+	if (!order || order.status === "rejected") {
+		purchaseReviewsFeedback.textContent = "No se puede confirmar la recepción de este pedido.";
 		return;
 	}
 	const previousValue = order.receivedConfirmed;
@@ -2244,7 +2249,7 @@ purchaseReviewsList.addEventListener("click", (event) => {
 		purchaseReviewsFeedback.textContent = "No se pudo guardar la confirmación en este navegador. Inténtalo de nuevo.";
 		return;
 	}
-	purchaseReviewsFeedback.textContent = "¡Excelente! Ahora cuéntanos cómo fue tu experiencia.";
+	purchaseReviewsFeedback.textContent = "¡Gracias! Ahora cuéntanos cómo fue tu experiencia.";
 	renderPurchaseReviews();
 });
 purchaseReviewsList.addEventListener("submit", (event) => {
@@ -2257,8 +2262,8 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		return;
 	}
 	const order = orders.find((entry) => entry.id === form.dataset.orderId);
-	if (!order || order.status !== "completed") {
-		purchaseReviewsFeedback.textContent = "Solo puedes reseñar un pedido completado.";
+	if (!order || order.status === "rejected" || !order.receivedConfirmed) {
+		purchaseReviewsFeedback.textContent = "Confirma primero que recibiste el pedido para poder reseñarlo.";
 		return;
 	}
 	const rating = Number(form.querySelector('input[name^="rating-"]:checked')?.value);
@@ -2283,7 +2288,7 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		return;
 	}
 	purchaseReviewsFeedback.textContent = `Reseña de ${getOrderDisplayId(order)} guardada. Gracias por compartir tu experiencia.`;
-	renderPurchaseReviews();
+	renderSales();
 });
 window.addEventListener("storage", (event) => {
 	if (event.key === ORDER_STORAGE_KEY) {
