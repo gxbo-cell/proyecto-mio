@@ -661,29 +661,36 @@ function createOrderReviewForm(order) {
 	heading.textContent = "¿Cómo fue tu experiencia?";
 	const introduction = document.createElement("p");
 	introduction.className = "purchase-review-form-intro";
-	introduction.textContent = "Cada estrella que nos regalas nos ayuda a crecer. ¡Gracias por elegir La Tiendita!";
+	introduction.textContent = "Tu sonrisa nos inspira. Cuéntanos cómo te fue en tu compra.";
 	const ratingFieldset = document.createElement("fieldset");
 	ratingFieldset.className = "sales-review-rating";
 	const ratingLegend = document.createElement("legend");
-	ratingLegend.textContent = "Elige de 1 a 5 estrellas";
+	ratingLegend.textContent = "Elige la carita que mejor describe tu experiencia";
 	ratingFieldset.append(ratingLegend);
+	const ratingFaces = [
+		{ emoji: "😠", label: "Muy enojado" },
+		{ emoji: "😞", label: "Insatisfecho" },
+		{ emoji: "😐", label: "Regular" },
+		{ emoji: "🙂", label: "Contento" },
+		{ emoji: "😄", label: "Muy feliz" }
+	];
 	for (let rating = 1; rating <= 5; rating += 1) {
 		const label = document.createElement("label");
-		label.className = "sales-review-star";
+		label.className = "sales-review-face";
 		const input = document.createElement("input");
 		input.type = "radio";
 		input.name = `rating-${order.id}`;
 		input.value = String(rating);
-		input.setAttribute("aria-label", `${rating} ${rating === 1 ? "estrella" : "estrellas"}`);
+		input.setAttribute("aria-label", `${rating} de 5: ${ratingFaces[rating - 1].label}`);
 		input.required = true;
 		input.checked = order.review?.rating === rating;
-		const star = document.createElement("span");
-		star.setAttribute("aria-hidden", "true");
-		star.textContent = "★";
+		const face = document.createElement("span");
+		face.setAttribute("aria-hidden", "true");
+		face.textContent = ratingFaces[rating - 1].emoji;
 		if (order.review?.rating >= rating) {
 			label.classList.add("selected");
 		}
-		label.append(input, star);
+		label.append(input, face);
 		ratingFieldset.append(label);
 	}
 
@@ -715,13 +722,13 @@ function createSavedReviewMessage(review) {
 	stars.className = "purchase-review-saved-stars";
 	stars.setAttribute("aria-label", `Calificación: ${review.rating} de 5 estrellas`);
 	for (let rating = 1; rating <= 5; rating += 1) {
-		const star = document.createElement("span");
-		star.setAttribute("aria-hidden", "true");
-		star.textContent = "★";
-		if (rating <= review.rating) {
-			star.classList.add("selected");
+		const face = document.createElement("span");
+		face.setAttribute("aria-hidden", "true");
+		face.textContent = ["😠", "😞", "😐", "🙂", "😄"][rating - 1];
+		if (rating === review.rating) {
+			face.classList.add("selected");
 		}
-		stars.append(star);
+		stars.append(face);
 	}
 	const thankYou = document.createElement("p");
 	thankYou.className = "purchase-review-thank-you";
@@ -2227,8 +2234,8 @@ purchaseReviewsList.addEventListener("change", (event) => {
 	const reasonLabel = form.querySelector(".sales-review-reason");
 	const reasonInput = reasonLabel.querySelector("textarea");
 	const isNegative = Number(event.target.value) <= 2;
-	form.querySelectorAll(".sales-review-star").forEach((star, index) => {
-		star.classList.toggle("selected", index < Number(event.target.value));
+	form.querySelectorAll(".sales-review-face").forEach((face, index) => {
+		face.classList.toggle("selected", index === Number(event.target.value) - 1);
 	});
 	reasonLabel.hidden = !isNegative;
 	reasonInput.required = isNegative;
