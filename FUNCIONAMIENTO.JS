@@ -723,8 +723,13 @@ function createOrderReviewForm(order) {
 	return form;
 }
 
-function renderPurchaseReviews() {
+function renderPurchaseReviews(focusOrderId = "") {
 	const reviewableOrders = orders.filter((order) => order.status !== "rejected");
+	if (focusOrderId) {
+		reviewableOrders.sort((first, second) =>
+			Number(second.id === focusOrderId) - Number(first.id === focusOrderId)
+		);
+	}
 	purchaseReviewsList.replaceChildren();
 	for (const order of reviewableOrders) {
 		const card = document.createElement("article");
@@ -911,11 +916,7 @@ function createOrderAction(orderId, action, label, className) {
 
 function openPurchaseReviewDialog(orderId = "") {
 	purchaseReviewsFeedback.textContent = "";
-	renderPurchaseReviews();
-	if (orderId) {
-		const orderCard = [...purchaseReviewsList.children].find((card) => card.dataset.orderId === orderId);
-		orderCard?.scrollIntoView({ block: "nearest" });
-	}
+	renderPurchaseReviews(orderId);
 	if (!purchaseReviewDialog.open) {
 		purchaseReviewDialog.showModal();
 	}
