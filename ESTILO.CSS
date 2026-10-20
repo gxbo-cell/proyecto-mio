@@ -105,6 +105,19 @@ h1 span { color: var(--green); }
 .sales-order-item-name { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .sales-order-item-copy small { color: var(--muted); font-size: 9px; }
 .sales-order-address { margin: 10px 0 0; color: #697166; font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
+.sales-order-review { display: grid; gap: 11px; margin-top: 15px; padding: 15px; border: 1px solid #e5eae6; border-radius: 8px; background: #fbfcfb; }
+.sales-order-review h3 { margin: 0; color: var(--ink); font-size: 13px; }
+.sales-review-label { display: grid; gap: 6px; color: #4b5b50; font-size: 10px; font-weight: 600; }
+.sales-review-date, .sales-review-reason textarea { width: 100%; min-height: 38px; padding: 9px 10px; border: 1px solid #e3e9e4; border-radius: 6px; color: var(--ink); background: #fff; font: 11px "DM Sans", sans-serif; }
+.sales-review-reason textarea { resize: vertical; }
+.sales-review-rating { display: flex; gap: 5px; margin: 0; padding: 0; border: 0; }
+.sales-review-rating legend { margin-bottom: 6px; color: #4b5b50; font-size: 10px; font-weight: 600; }
+.sales-review-star { position: relative; cursor: pointer; }
+.sales-review-star input { width: 1px; height: 1px; position: absolute; opacity: 0; }
+.sales-review-star span { display: block; padding: 1px 3px; color: #c8cdc8; font-size: 25px; line-height: 1; }
+.sales-review-star input:checked + span, .sales-review-star:has(input:checked) span { color: #e6a83f; }
+.sales-review-star:focus-within span { outline: 2px solid var(--green); outline-offset: 2px; }
+.sales-order-review .primary-button { justify-self: start; min-height: 37px; padding: 0 14px; }
 .sales-order-footer { margin-top: 12px; }
 .sales-order-total-wrap { flex-direction: column; gap: 3px; }
 .sales-order-total-wrap span { color: var(--muted); font-size: 9px; }
@@ -614,6 +627,9 @@ h2 { color: #26332c; font-family: "DM Sans", sans-serif; font-size: 21px; font-w
 .sales-order-items li, .sales-order-items li > strong { font-size: 11px; }
 .sales-order-item-copy small { font-size: 10px; }
 .sales-order-footer { margin-top: 14px; }
+.sales-order-review { padding: 16px; border-radius: 9px; }
+.sales-review-date, .sales-review-reason textarea { border-color: #e3e9e4; border-radius: 7px; }
+.sales-review-date:focus, .sales-review-reason textarea:focus { outline: 0; border-color: #4e9470; box-shadow: 0 0 0 3px rgba(39, 116, 81, .11); }
 .sales-order-total-wrap span { font-size: 10px; }
 .sales-order-total-wrap strong { font-size: 18px; }
 .sales-accept-button, .sales-reject-button { min-height: 39px; padding: 0 16px; border-radius: 7px; font-size: 11px; }

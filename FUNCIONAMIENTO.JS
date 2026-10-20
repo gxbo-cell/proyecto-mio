@@ -646,6 +646,69 @@ function getOrderStatusLabel(status) {
 	}[status] || "Pedido";
 }
 
+function createOrderReviewForm(order) {
+	const form = document.createElement("form");
+	form.className = "sales-order-review";
+	form.dataset.orderReview = "";
+	form.dataset.orderId = order.id;
+
+	const heading = document.createElement("h3");
+	heading.textContent = order.review ? "Tu reseña" : "¿Cuándo recibiste tu pedido?";
+	const dateLabel = document.createElement("label");
+	dateLabel.className = "sales-review-label";
+	dateLabel.textContent = "Fecha de recepción";
+	const dateInput = document.createElement("input");
+	dateInput.className = "sales-review-date";
+	dateInput.type = "date";
+	dateInput.name = "receivedAt";
+	dateInput.max = new Date().toLocaleDateString("en-CA");
+	dateInput.value = order.review?.receivedAt || "";
+	dateInput.required = true;
+	dateLabel.append(dateInput);
+
+	const ratingFieldset = document.createElement("fieldset");
+	ratingFieldset.className = "sales-review-rating";
+	const ratingLegend = document.createElement("legend");
+	ratingLegend.textContent = "Califica tu experiencia";
+	ratingFieldset.append(ratingLegend);
+	for (let rating = 1; rating <= 5; rating += 1) {
+		const label = document.createElement("label");
+		label.className = "sales-review-star";
+		const input = document.createElement("input");
+		input.type = "radio";
+		input.name = `rating-${order.id}`;
+		input.value = String(rating);
+		input.setAttribute("aria-label", `${rating} ${rating === 1 ? "estrella" : "estrellas"}`);
+		input.required = true;
+		input.checked = order.review?.rating === rating;
+		const star = document.createElement("span");
+		star.setAttribute("aria-hidden", "true");
+		star.textContent = "★";
+		label.append(input, star);
+		ratingFieldset.append(label);
+	}
+
+	const reasonLabel = document.createElement("label");
+	reasonLabel.className = "sales-review-label sales-review-reason";
+	reasonLabel.textContent = "Cuéntanos qué salió mal (obligatorio para 1 o 2 estrellas)";
+	const reasonInput = document.createElement("textarea");
+	reasonInput.name = "reason";
+	reasonInput.rows = 3;
+	reasonInput.maxLength = 500;
+	reasonInput.placeholder = "Escribe el motivo de tu calificación";
+	reasonInput.value = order.review?.reason || "";
+	reasonInput.required = order.review?.rating <= 2;
+	reasonLabel.hidden = !reasonInput.required;
+	reasonLabel.append(reasonInput);
+
+	const submit = document.createElement("button");
+	submit.className = "primary-button";
+	submit.type = "submit";
+	submit.textContent = order.review ? "Actualizar reseña" : "Guardar reseña";
+	form.append(heading, dateLabel, ratingFieldset, reasonLabel, submit);
+	return form;
+}
+
 function renderSales() {
 	const pendingOrders = orders.filter((order) => order.status === "pending");
 	const acceptedOrders = orders.filter((order) => order.status === "accepted");
@@ -742,6 +805,9 @@ function renderSales() {
 			address.className = "sales-order-address";
 			address.textContent = `Entrega: ${order.delivery.location}`;
 			card.append(address);
+		}
+		if (order.status === "completed") {
+			card.append(createOrderReviewForm(order));
 		}
 		card.append(footer);
 		salesOrdersList.append(card);
@@ -2046,6 +2112,55 @@ salesOrdersList.addEventListener("click", (event) => {
 	if (nextStatus) {
 		updateOrderStatus(button.dataset.orderId, nextStatus);
 	}
+});
+salesOrdersList.addEventListener("change", (event) => {
+	if (!event.target.matches(".sales-review-rating input")) {
+		return;
+	}
+	const form = event.target.closest("[data-order-review]");
+	const reasonLabel = form.querySelector(".sales-review-reason");
+	const reasonInput = reasonLabel.querySelector("textarea");
+	const isNegative = Number(event.target.value) <= 2;
+	reasonLabel.hidden = !isNegative;
+	reasonInput.required = isNegative;
+});
+salesOrdersList.addEventListener("submit", (event) => {
+	const form = event.target.closest("[data-order-review]");
+	if (!form) {
+		return;
+	}
+	event.preventDefault();
+	if (!form.reportValidity()) {
+		return;
+	}
+	const order = orders.find((entry) => entry.id === form.dataset.orderId);
+	if (!order || order.status !== "completed") {
+		salesFeedback.textContent = "Solo puedes reseñar un pedido completado.";
+		return;
+	}
+	const rating = Number(form.querySelector('input[name^="rating-"]:checked')?.value);
+	const reason = form.elements.reason.value.trim();
+	if (!Number.isInteger(rating) || rating < 1 || rating > 5 || (rating <= 2 && !reason)) {
+		salesFeedback.textContent = "Selecciona de 1 a 5 estrellas y explica las calificaciones de 1 o 2 estrellas.";
+		return;
+	}
+	const previousReview = order.review;
+	order.review = {
+		receivedAt: form.elements.receivedAt.value,
+		rating,
+		reason: rating <= 2 ? reason : ""
+	};
+	if (!saveOrders()) {
+		if (previousReview) {
+			order.review = previousReview;
+		} else {
+			delete order.review;
+		}
+		salesFeedback.textContent = "No se pudo guardar la reseña en este navegador. Inténtalo de nuevo.";
+		return;
+	}
+	salesFeedback.textContent = `Reseña de ${getOrderDisplayId(order)} guardada. Gracias por compartir tu experiencia.`;
+	renderSales();
 });
 window.addEventListener("storage", (event) => {
 	if (event.key === ORDER_STORAGE_KEY) {
