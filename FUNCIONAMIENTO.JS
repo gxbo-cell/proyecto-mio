@@ -1112,19 +1112,21 @@ async function updateProductStock(productId, requestedStock) {
 	if (editingProductId === product.id) {
 		cancelProductEdit();
 	}
-	product.stock = stock;
-	if (getCartQuantity(productId) > stock) {
-		cart = cart.filter((item) => item.productId !== productId);
-		showFeedback(`${product.name}: el stock se actualizó y se retiró del carrito porque excedía las existencias.`);
-	} else {
-		showFeedback(`${product.name}: existencias actualizadas a ${stock}.`);
-	}
+	const previousCart = cart.slice();
 	try {
-		await saveProduct(product);
+		await saveProduct({ ...product, stock });
+		product.stock = stock;
+		if (getCartQuantity(productId) > stock) {
+			cart = cart.filter((item) => item.productId !== productId);
+			showFeedback(`${product.name}: el stock se actualizó y se retiró del carrito porque excedía las existencias.`);
+		} else {
+			showFeedback(`${product.name}: existencias actualizadas a ${stock}.`);
+		}
 		await loadProducts();
 		renderProducts();
 		renderCart();
 	} catch (error) {
+		cart = previousCart;
 		showFeedback(`No se pudo guardar el inventario: ${getBackendError(error)}`, true);
 		await refreshStoreData();
 	}
@@ -2135,7 +2137,7 @@ async function completePurchase(paymentMethod) {
 	purchaseTotal.textContent = formatMoney(total);
 	document.querySelector("#purchase-total-bs").textContent = formatBolivars(total);
 	document.querySelector("#purchase-delivery").textContent = deliveryLocation
-		? `Pedido enviado a ventas · ${deliveryLocation} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)})`
+		? `Pedido enviado a ventas · ${deliveryLocation} · ${formatMoney(order.delivery.fee)} (${formatBolivars(order.delivery.fee)})`
 		: "Retiro en tienda";
 
 	cart = [];
@@ -2179,6 +2181,7 @@ productForm.addEventListener("submit", async (event) => {
 	const editedProduct = editingProductId
 		? products.find((product) => product.id === editingProductId)
 		: null;
+	const previousCart = cart.slice();
 	let cartItemRemoved = false;
 	let cartRemovedForSaleModeChange = false;
 	if (editingProductId && !editedProduct) {
@@ -2211,6 +2214,7 @@ productForm.addEventListener("submit", async (event) => {
 	try {
 		await saveProduct(savedProduct);
 	} catch (error) {
+		cart = previousCart;
 		showFeedback(`No se pudo guardar el producto: ${getBackendError(error)}`, true);
 		await refreshStoreData();
 		return;
