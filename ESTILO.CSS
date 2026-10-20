@@ -115,7 +115,7 @@ h1 span { color: var(--green); }
 .sales-review-star { position: relative; cursor: pointer; }
 .sales-review-star input { width: 1px; height: 1px; position: absolute; opacity: 0; }
 .sales-review-star span { display: block; padding: 1px 3px; color: #c8cdc8; font-size: 25px; line-height: 1; }
-.sales-review-star input:checked + span, .sales-review-star:has(input:checked) span { color: #e6a83f; }
+.sales-review-star input:checked + span { color: #e6a83f; }
 .sales-review-star:focus-within span { outline: 2px solid var(--green); outline-offset: 2px; }
 .sales-order-review .primary-button { justify-self: start; min-height: 37px; padding: 0 14px; }
 .sales-order-footer { margin-top: 12px; }

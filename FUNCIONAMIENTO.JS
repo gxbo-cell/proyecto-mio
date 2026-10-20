@@ -661,7 +661,8 @@ function createOrderReviewForm(order) {
 	dateInput.className = "sales-review-date";
 	dateInput.type = "date";
 	dateInput.name = "receivedAt";
-	dateInput.max = new Date().toLocaleDateString("en-CA");
+	const today = new Date();
+	dateInput.max = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 	dateInput.value = order.review?.receivedAt || "";
 	dateInput.required = true;
 	dateLabel.append(dateInput);
