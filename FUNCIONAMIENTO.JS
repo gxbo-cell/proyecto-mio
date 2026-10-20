@@ -2489,6 +2489,57 @@ document.querySelector("#confirm-map-location").addEventListener("click", select
 document.querySelector("#close-map-picker").addEventListener("click", () => mapPickerDialog.close());
 document.querySelector("#cancel-map-picker").addEventListener("click", () => mapPickerDialog.close());
 checkoutButton.addEventListener("click", openCheckout);
+accountButton.addEventListener("click", () => {
+	accountFeedback.textContent = "";
+	accountDialog.showModal();
+});
+document.querySelector("#close-account").addEventListener("click", () => accountDialog.close());
+document.querySelector("#account-mode-toggle").addEventListener("click", (event) => {
+	isCreatingAccount = !isCreatingAccount;
+	event.currentTarget.textContent = isCreatingAccount ? "Ya tengo una cuenta" : "Crear cuenta nueva";
+	document.querySelector("#account-title").textContent = isCreatingAccount ? "Crea tu cuenta" : "Bienvenido a La Tiendita";
+	document.querySelector("#account-description").textContent = isCreatingAccount
+		? "Regístrate con tu correo para realizar compras y consultar tus pedidos."
+		: "Inicia sesión para comprar y consultar tus pedidos.";
+	document.querySelector("#account-form button[type='submit']").textContent = isCreatingAccount ? "Crear cuenta" : "Iniciar sesión";
+	document.querySelector("#account-password").autocomplete = isCreatingAccount ? "new-password" : "current-password";
+	accountFeedback.textContent = "";
+});
+accountForm.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	accountFeedback.textContent = "";
+	const submitButton = accountForm.querySelector('button[type="submit"]');
+	submitButton.disabled = true;
+	const credentials = {
+		email: accountForm.elements.email.value.trim(),
+		password: accountForm.elements.password.value
+	};
+	try {
+		const result = isCreatingAccount
+			? await supabaseClient.auth.signUp(credentials)
+			: await supabaseClient.auth.signInWithPassword(credentials);
+		if (result.error) {
+			throw result.error;
+		}
+		if (isCreatingAccount && !result.data.session) {
+			accountFeedback.textContent = "Cuenta creada. Revisa tu correo para confirmar el registro antes de iniciar sesión.";
+			return;
+		}
+		accountDialog.close();
+		accountForm.reset();
+	} catch (error) {
+		accountFeedback.textContent = `No se pudo completar el acceso: ${getBackendError(error)}`;
+	} finally {
+		submitButton.disabled = false;
+	}
+});
+signOutButton.addEventListener("click", async () => {
+	const { error } = await supabaseClient.auth.signOut();
+	if (error) {
+		catalogFeedback.textContent = `No se pudo cerrar sesión: ${getBackendError(error)}`;
+	}
+});
+myOrdersButton.addEventListener("click", () => openPurchaseReviewDialog(null));
 document.querySelector("#cancel-delete-product").addEventListener("click", () => deleteConfirmDialog.close());
 document.querySelector("#confirm-delete-product").addEventListener("click", confirmProductDeletion);
 deleteConfirmDialog.addEventListener("close", () => {
@@ -2543,14 +2594,11 @@ document.querySelector("#sales-date").textContent = new Intl.DateTimeFormat("es"
 	month: "long",
 	year: "numeric"
 }).format(new Date()).toLocaleUpperCase("es");
-renderProducts();
-renderCart();
-renderSales();
-renderShoppingReviewSummary();
 configureProductFormMode();
 window.setInterval(() => {
 	if (document.visibilityState === "visible") {
 		loadDailyRate();
+		initializeBackend();
 	}
 }, RATE_REFRESH_INTERVAL_MS);
 document.addEventListener("visibilitychange", () => {
