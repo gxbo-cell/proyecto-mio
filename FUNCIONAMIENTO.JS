@@ -332,24 +332,78 @@ function renderExchangeRate(prefix = "Fecha valor · ") {
 	document.querySelector("#shopping-rate-updated").textContent = updatedDate;
 }
 
-function saveProducts(showError = true) {
-	try {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-		return true;
-	} catch {
-		if (showError) {
-			showFeedback("No se pudo guardar en este navegador.", true);
-		}
-		return false;
+async function refreshReviewSummary() {
+	const { data, error } = await supabaseClient.rpc("get_store_review_summary");
+	if (error) {
+		shoppingReviewAverage.textContent = "—";
+		shoppingReviewCount.textContent = "Reseñas no disponibles";
+		return;
 	}
+	const summary = Array.isArray(data) ? data[0] : data;
+	const count = Number(summary?.review_count || 0);
+	shoppingReviewAverage.textContent = count ? Number(summary.average_rating).toFixed(1) : "—";
+	shoppingReviewCount.textContent = count ? `${count} ${count === 1 ? "reseña" : "reseñas"}` : "Aún sin reseñas";
 }
 
-function saveOrders() {
+function updateAccountInterface() {
+	const adminButtons = document.querySelectorAll('[data-view-target="sales-view"], [data-view-target="admin-view"]');
+	adminButtons.forEach((button) => {
+		button.hidden = !isStoreAdmin;
+	});
+	myOrdersButton.hidden = !currentUser;
+	accountButton.hidden = Boolean(currentUser);
+	signOutButton.hidden = !currentUser;
+	accountButton.textContent = "Iniciar sesión";
+}
+
+async function applySession(session) {
+	currentUser = session?.user || null;
+	isStoreAdmin = false;
+	if (currentUser) {
+		const { data, error } = await supabaseClient.rpc("is_store_admin");
+		if (error) {
+			throw error;
+		}
+		isStoreAdmin = data === true;
+	}
+	updateAccountInterface();
+	await refreshStoreData();
+}
+
+async function initializeBackend() {
+	const config = window.LA_TIENDITA_SUPABASE;
+	if (!config?.url || !config?.anonKey) {
+		catalogFeedback.textContent = "La tienda compartida aún no está configurada. Añade SUPABASE_URL y SUPABASE_ANON_KEY en los secretos de GitHub Actions.";
+		checkoutButton.disabled = true;
+		return;
+	}
+	if (!window.supabase?.createClient) {
+		catalogFeedback.textContent = "No se pudo cargar el cliente de la tienda. Revisa tu conexión e inténtalo de nuevo.";
+		checkoutButton.disabled = true;
+		return;
+	}
 	try {
-		localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
-		return true;
-	} catch {
-		return false;
+		supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+		const { data, error } = await supabaseClient.auth.getSession();
+		if (error) {
+			throw error;
+		}
+		await applySession(data.session);
+		supabaseClient.auth.onAuthStateChange((_event, session) => {
+			window.setTimeout(() => {
+				applySession(session).catch((authError) => {
+					catalogFeedback.textContent = `No se pudo actualizar tu sesión: ${getBackendError(authError)}`;
+				});
+			}, 0);
+		});
+		supabaseClient.channel("store-orders")
+			.on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+				refreshStoreData();
+			})
+			.subscribe();
+	} catch (error) {
+		catalogFeedback.textContent = `No se pudo conectar con la tienda: ${getBackendError(error)}`;
+		checkoutButton.disabled = true;
 	}
 }
 
