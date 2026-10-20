@@ -202,7 +202,7 @@ declare
 	v_order public.orders%rowtype;
 	v_reason text := trim(coalesce(p_reason, ''));
 begin
-	if p_rating not between 1 and 5 or (p_rating <= 2 and v_reason = '') or char_length(v_reason) > 500 then
+	if p_rating is null or p_rating not between 1 and 5 or (p_rating <= 2 and v_reason = '') or char_length(v_reason) > 500 then
 		raise exception 'La calificación o el motivo no son válidos.';
 	end if;
 	update public.orders
@@ -283,12 +283,6 @@ drop policy if exists "Customers and admins read orders" on public.orders;
 create policy "Customers and admins read orders" on public.orders
 	for select to authenticated
 	using (user_id = (select auth.uid()) or (select public.is_store_admin()));
-drop policy if exists "Admins update orders" on public.orders;
-create policy "Admins update orders" on public.orders
-	for update to authenticated
-	using ((select public.is_store_admin()))
-	with check ((select public.is_store_admin()));
-
 revoke all on public.admin_users from anon, authenticated;
 revoke insert, update, delete on public.orders from anon, authenticated;
 grant select on public.products to anon, authenticated;
