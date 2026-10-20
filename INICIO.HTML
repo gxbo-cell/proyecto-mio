@@ -26,6 +26,10 @@
 			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Inventario</button>
 		</nav>
 	</header>
+	<button id="reviews-summary-button" class="reviews-summary-button" type="button" aria-haspopup="dialog" aria-controls="purchase-review-dialog">
+		<span class="reviews-summary-stars" aria-hidden="true">★★★★★</span>
+		<span id="reviews-summary-text">Sin reseñas</span>
+	</button>
 
 	<main id="inicio" class="page-shell">
 		<section id="shopping-view" class="app-view" aria-labelledby="page-title">
@@ -130,17 +134,6 @@
 				</section>
 			</aside>
 			</div>
-			<section id="purchase-reviews" class="purchase-reviews-panel" aria-labelledby="purchase-reviews-title" hidden>
-				<div class="section-heading purchase-reviews-heading">
-					<div>
-						<p class="eyebrow">TU EXPERIENCIA</p>
-						<h2 id="purchase-reviews-title">Pedidos completados</h2>
-					</div>
-				</div>
-				<p class="purchase-reviews-note">Cuando la tienda confirme tu pedido, podrás indicarnos que ya lo recibiste y compartir tu experiencia.</p>
-				<p id="purchase-reviews-feedback" class="sales-feedback" role="status" aria-live="polite"></p>
-				<div id="purchase-reviews-list" class="purchase-reviews-list"></div>
-			</section>
 		</section>
 
 		<section id="sales-view" class="app-view" aria-labelledby="sales-title" hidden>
@@ -259,6 +252,25 @@
 				</aside>
 			</div>
 		</section>
+
+		<dialog id="purchase-review-dialog" class="purchase-review-dialog" aria-labelledby="purchase-review-title" aria-describedby="purchase-review-intro">
+			<div class="purchase-review-dialog-header">
+				<div class="purchase-review-dialog-icon" aria-hidden="true">★</div>
+				<div class="purchase-review-dialog-heading">
+					<p class="eyebrow">TU OPINIÓN NOS AYUDA</p>
+					<h2 id="purchase-review-title">Reseñas de compras</h2>
+				</div>
+				<button id="close-purchase-review" class="dialog-close" type="button" aria-label="Cerrar reseñas">×</button>
+			</div>
+			<p id="purchase-review-intro" class="purchase-review-dialog-intro">Cuando recibas tu pedido, confírmalo y cuéntanos cómo fue tu experiencia.</p>
+			<div class="reviews-dialog-summary">
+				<strong id="reviews-dialog-average">0.0</strong>
+				<span class="reviews-summary-stars" aria-hidden="true">★★★★★</span>
+				<span id="reviews-dialog-count">Aún no hay reseñas</span>
+			</div>
+			<p id="purchase-reviews-feedback" class="sales-feedback" role="status" aria-live="polite"></p>
+			<div id="purchase-reviews-list" class="purchase-reviews-list"></div>
+		</dialog>
 
 		<dialog id="checkout-dialog" class="checkout-dialog" aria-labelledby="checkout-title">
 			<form id="checkout-form">
