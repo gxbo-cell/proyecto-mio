@@ -687,6 +687,12 @@ td { border-color: #edf0ed; }
 	.sales-order-id { font-size: 12px; }
 	.sales-order-time { font-size: 9px; }
 	.sales-order-status { padding: 5px 8px; font-size: 9px; }
+	.purchase-reviews-panel { padding: 17px 13px; border-radius: 10px; }
+	.purchase-review-card { padding: 15px 12px 13px; }
+	.purchase-received-prompt { align-items: stretch; flex-direction: column; gap: 12px; padding: 14px; }
+	.purchase-received-prompt p { font-size: 11px; }
+	.purchase-received-button { width: 100%; }
+	.purchase-review-form { padding: 13px; }
 	.sales-order-actions button { flex: 1; padding: 0 8px; font-size: 10px; }
 	.inventory-panel { padding: 18px 13px 8px; border-radius: 10px; }
 	.form-panel, .cart-panel, .delivery-panel { border-radius: 10px; }
