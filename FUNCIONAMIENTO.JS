@@ -1,7 +1,5 @@
 "use strict";
 
-const STORAGE_KEY = "la-tiendita-inventory-v1";
-const ORDER_STORAGE_KEY = "la-tiendita-orders-v1";
 const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v1";
 const RATE_ENDPOINT = "https://ve.dolarapi.com/v1/dolares/oficial";
 const RATE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -17,13 +15,6 @@ const WEIGHT_UNITS = {
 	kg: { grams: GRAMS_PER_KILOGRAM, step: "0.001", minimum: "0.001" },
 	lb: { grams: GRAMS_PER_POUND, step: "0.01", minimum: "0.01" }
 };
-try {
-	localStorage.removeItem("la-tiendita-supabase-config-v1");
-	localStorage.removeItem("la-tiendita-driver-session-v1");
-	localStorage.removeItem("la-tiendita-latest-delivery-v1");
-} catch {
-	// The app can still run when browser storage is unavailable.
-}
 const currencyFormatter = new Intl.NumberFormat("en-US", {
 	style: "currency",
 	currency: "USD"
@@ -100,9 +91,20 @@ const salesFilterEmpty = document.querySelector("#sales-filter-empty");
 const salesFeedback = document.querySelector("#sales-feedback");
 const salesStatusFilter = document.querySelector("#sales-status-filter");
 const pendingOrderCount = document.querySelector("#pending-order-count");
+const accountDialog = document.querySelector("#account-dialog");
+const accountForm = document.querySelector("#account-form");
+const accountFeedback = document.querySelector("#account-feedback");
+const accountButton = document.querySelector("#account-button");
+const signOutButton = document.querySelector("#sign-out-button");
+const myOrdersButton = document.querySelector("#my-orders-button");
 
-let products = loadProducts();
-let orders = loadOrders();
+let products = [];
+let orders = [];
+let supabaseClient = null;
+let currentUser = null;
+let isStoreAdmin = false;
+let isCreatingAccount = false;
+let activeReviewOrderId = null;
 let cart = [];
 let exchangeRate = loadCachedRate();
 let isLoadingExchangeRate = false;
@@ -181,43 +183,86 @@ function updateProductCategorySuggestion() {
 	productCategoryHint.textContent = `Categoría sugerida: ${suggestedCategory}. Puedes cambiarla si hace falta.`;
 }
 
-function loadProducts() {
-	try {
-		const savedProducts = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-		return Array.isArray(savedProducts)
-			? savedProducts.filter((product) =>
-				product && typeof product.id === "string" &&
-				typeof product.name === "string" &&
-				Number.isFinite(product.price) && product.price > 0 &&
-				Number.isInteger(product.stock) && product.stock >= 0
-			).map((product) => ({
-				...product,
-				category: ["Carnes", "Charcutería", "Víveres", "Bebidas", "Lácteos", "Otros"].includes(product.category)
-					? product.category
-					: "Otros",
-				saleMode: product.saleMode === "weight" ? "weight" : "unit"
-			}))
-			: [];
-	} catch {
-		return [];
+function mapProduct(row) {
+	return {
+		id: row.id,
+		name: row.name,
+		price: Number(row.price),
+		category: row.category,
+		saleMode: row.sale_mode,
+		stock: row.stock
+	};
+}
+
+function mapOrder(row) {
+	return {
+		id: row.id,
+		createdAt: row.created_at,
+		status: row.status,
+		paymentMethod: row.payment_method,
+		total: Number(row.total),
+		delivery: row.delivery,
+		items: row.items,
+		receivedConfirmed: row.received_confirmed,
+		review: row.review_rating == null ? null : {
+			rating: row.review_rating,
+			reason: row.review_reason || ""
+		}
+	};
+}
+
+async function loadProducts() {
+	const { data, error } = await supabaseClient.from("products").select("*").order("name");
+	if (error) {
+		throw error;
+	}
+	products = data.map(mapProduct);
+}
+
+async function loadOrders() {
+	if (!currentUser) {
+		orders = [];
+		return;
+	}
+	const { data, error } = await supabaseClient.from("orders").select("*").order("created_at", { ascending: false });
+	if (error) {
+		throw error;
+	}
+	orders = data.map(mapOrder);
+}
+
+async function saveProduct(product) {
+	const { error } = await supabaseClient.from("products").upsert({
+		id: product.id,
+		name: product.name,
+		price: product.price,
+		category: product.category,
+		sale_mode: product.saleMode,
+		stock: product.stock
+	});
+	if (error) {
+		throw error;
 	}
 }
 
-function loadOrders() {
+function getBackendError(error) {
+	return error?.message || "Ocurrió un error al comunicarse con la tienda.";
+}
+
+async function refreshStoreData() {
 	try {
-		const savedOrders = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY) || "[]");
-		return Array.isArray(savedOrders)
-			? savedOrders.filter((order) =>
-				order && typeof order.id === "string" &&
-				typeof order.createdAt === "string" && Number.isFinite(Date.parse(order.createdAt)) &&
-				["pending", "accepted", "completed", "rejected"].includes(order.status) &&
-				Number.isFinite(order.total) && order.total >= 0 &&
-				Array.isArray(order.items) && order.items.length > 0
-			)
-			: [];
-	} catch {
-		return [];
+		await loadProducts();
+		await loadOrders();
+		renderProducts();
+		renderCart();
+		renderSales();
+		if (activeReviewOrderId && purchaseReviewDialog.open) {
+			renderPurchaseReviews(activeReviewOrderId);
+		}
+	} catch (error) {
+		catalogFeedback.textContent = `No se pudieron cargar los datos compartidos: ${getBackendError(error)}`;
 	}
+	await refreshReviewSummary();
 }
 
 function loadCachedRate() {
