@@ -693,8 +693,6 @@ td { border-color: #edf0ed; }
 	.sales-intro { min-height: 0; gap: 12px; margin-top: 16px; padding: 25px 22px; border-radius: 13px; }
 	.sales-intro h1 { font-size: 36px; }
 	.sales-intro .intro-copy { max-width: 300px; margin-bottom: 0; }
-	.shopping-reviews-summary { margin-bottom: 10px; padding: 8px 11px; font-size: 9px; }
-	.shopping-reviews-icon { width: 21px; height: 21px; }
 	.sales-stats { gap: 9px; }
 	.sales-stat { min-height: 105px; padding: 15px 10px 12px 45px; border-radius: 9px; }
 	.sales-stat-icon { width: 25px; height: 25px; top: 15px; left: 11px; }

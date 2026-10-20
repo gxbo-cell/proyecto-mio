@@ -703,7 +703,7 @@ function createOrderReviewForm(order) {
 	const submit = document.createElement("button");
 	submit.className = "primary-button";
 	submit.type = "submit";
-	submit.textContent = order.review ? "Actualizar reseña" : "Guardar reseña";
+	submit.textContent = "Enviar mi reseña";
 	form.append(heading, introduction, ratingFieldset, reasonLabel, submit);
 	return form;
 }
@@ -2267,7 +2267,11 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		return;
 	}
 	const order = orders.find((entry) => entry.id === form.dataset.orderId);
-	if (!order || order.status === "rejected" || !order.receivedConfirmed || order.review) {
+	if (order?.review) {
+		purchaseReviewsFeedback.textContent = "Esta compra ya tiene una reseña. ¡Gracias por compartir tu opinión!";
+		return;
+	}
+	if (!order || order.status === "rejected" || !order.receivedConfirmed) {
 		purchaseReviewsFeedback.textContent = "Confirma primero que recibiste el pedido para poder reseñarlo.";
 		return;
 	}
