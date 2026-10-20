@@ -105,7 +105,6 @@ h1 span { color: var(--green); }
 .sales-order-item-name { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .sales-order-item-copy small { color: var(--muted); font-size: 9px; }
 .sales-order-address { margin: 10px 0 0; color: #697166; font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
-.reviews-summary-stars { color: #e6a83f; font-size: 14px; letter-spacing: 1px; white-space: nowrap; }
 .purchase-review-dialog { width: min(560px, calc(100% - 32px)); max-width: none; max-height: min(84vh, 760px); padding: 25px; overflow-y: auto; border: 1px solid #e3e9e4; border-radius: 16px; color: var(--ink); background: #fffefa; box-shadow: 0 22px 70px rgba(27, 34, 28, .25); }
 .purchase-review-dialog::backdrop { background: rgba(28, 35, 30, .52); backdrop-filter: blur(3px); }
 .purchase-review-dialog-header { display: flex; align-items: center; gap: 12px; }
