@@ -197,6 +197,7 @@ function mapProduct(row) {
 function mapOrder(row) {
 	return {
 		id: row.id,
+		userId: row.user_id,
 		createdAt: row.created_at,
 		status: row.status,
 		paymentMethod: row.payment_method,
@@ -844,9 +845,10 @@ function renderShoppingReviewSummary() {
 
 function renderPurchaseReviews(orderId) {
 	purchaseReviewsList.replaceChildren();
+	const ownOrders = isStoreAdmin ? orders.filter((entry) => entry.userId === currentUser.id) : orders;
 	const matchingOrders = orderId
-		? orders.filter((entry) => entry.id === orderId && entry.status !== "rejected")
-		: orders.filter((entry) => entry.status !== "rejected");
+		? ownOrders.filter((entry) => entry.id === orderId && entry.status !== "rejected")
+		: ownOrders.filter((entry) => entry.status !== "rejected");
 	if (matchingOrders.length === 0) {
 		const unavailable = document.createElement("p");
 		unavailable.className = "purchase-reviews-empty";
