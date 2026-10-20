@@ -29,11 +29,14 @@ jobs:
       - name: Prepare static site
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           mkdir _site
           cp INICIO.HTML _site/index.html
           cp FUNCIONAMIENTO.JS ESTILO.CSS _site/
           node -e "require('fs').writeFileSync('_site/MAPS_CONFIG.JS', 'window.GOOGLE_MAPS_API_KEY = ' + JSON.stringify(process.env.GOOGLE_MAPS_API_KEY || '') + ';\\n')"
+          node -e "require('fs').writeFileSync('_site/SUPABASE_CONFIG.JS', 'window.LA_TIENDITA_SUPABASE = ' + JSON.stringify({url: process.env.SUPABASE_URL || '', anonKey: process.env.SUPABASE_ANON_KEY || ''}) + ';\\n')"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

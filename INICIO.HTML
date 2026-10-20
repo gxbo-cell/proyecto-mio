@@ -11,7 +11,9 @@
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 	<link rel="stylesheet" href="ESTILO.CSS">
 	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 	<script src="MAPS_CONFIG.JS" defer></script>
+	<script src="SUPABASE_CONFIG.JS" defer></script>
 	<script src="FUNCIONAMIENTO.JS" defer></script>
 </head>
 <body>
@@ -22,9 +24,14 @@
 		</a>
 		<nav class="view-switch" aria-label="Secciones de la tienda">
 			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true">Compras</button>
-			<button class="view-switch-button" type="button" data-view-target="sales-view" aria-pressed="false">Ventas <span id="pending-order-count" class="nav-badge" hidden>0</span></button>
-			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false">Inventario</button>
+			<button class="view-switch-button" type="button" data-view-target="sales-view" aria-pressed="false" hidden>Ventas <span id="pending-order-count" class="nav-badge" hidden>0</span></button>
+			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false" hidden>Inventario</button>
 		</nav>
+		<div class="account-actions">
+			<button id="my-orders-button" class="account-button" type="button" hidden>Mis pedidos</button>
+			<button id="account-button" class="account-button" type="button">Iniciar sesión</button>
+			<button id="sign-out-button" class="account-button" type="button" hidden>Cerrar sesión</button>
+		</div>
 	</header>
 	<main id="inicio" class="page-shell">
 		<section id="shopping-view" class="app-view" aria-labelledby="page-title">
@@ -267,6 +274,25 @@
 			<p id="purchase-review-intro" class="purchase-review-dialog-intro">Confirma cuando recibas tu pedido y califícanos con estrellas.</p>
 			<p id="purchase-reviews-feedback" class="sales-feedback" role="status" aria-live="polite"></p>
 			<div id="purchase-reviews-list" class="purchase-reviews-list"></div>
+		</dialog>
+
+		<dialog id="account-dialog" class="checkout-dialog" aria-labelledby="account-title">
+			<form id="account-form">
+				<div class="dialog-heading">
+					<div><p class="eyebrow">TU CUENTA</p><h2 id="account-title">Bienvenido a La Tiendita</h2></div>
+					<button id="close-account" class="dialog-close" type="button" aria-label="Cerrar">×</button>
+				</div>
+				<p id="account-description" class="dialog-copy">Inicia sesión para comprar y consultar tus pedidos.</p>
+				<label class="field-label" for="account-email">Correo electrónico</label>
+				<input id="account-email" name="email" type="email" autocomplete="email" required>
+				<label class="field-label" for="account-password">Contraseña</label>
+				<input id="account-password" name="password" type="password" autocomplete="current-password" minlength="8" required>
+				<p id="account-feedback" class="checkout-feedback" role="status" aria-live="polite"></p>
+				<div class="dialog-actions">
+					<button id="account-mode-toggle" class="secondary-button" type="button">Crear cuenta nueva</button>
+					<button class="primary-button" type="submit">Iniciar sesión</button>
+				</div>
+			</form>
 		</dialog>
 
 		<dialog id="checkout-dialog" class="checkout-dialog" aria-labelledby="checkout-title">

@@ -44,6 +44,9 @@ button { cursor: pointer; }
 .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: #fffefa; background: var(--green); font-size: 11px; letter-spacing: 0; }
 .brand-period { color: var(--coral); }
 .topbar-note { display: flex; align-items: center; gap: 9px; color: #5d6258; font-size: 12px; font-weight: 600; }
+.account-actions { display: flex; align-items: center; gap: 7px; }
+.account-button { min-height: 34px; padding: 0 11px; border: 1px solid #dfe6df; border-radius: 7px; color: var(--green-dark); background: #fffefa; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.account-button:hover { background: #edf4ef; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #63a275; box-shadow: 0 0 0 3px rgba(99, 162, 117, .13); }
 
 .page-shell { width: min(1150px, calc(100% - 48px)); margin: 0 auto; }
