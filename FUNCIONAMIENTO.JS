@@ -58,6 +58,8 @@ const purchaseTotal = document.querySelector("#purchase-total");
 const purchaseReviewDialog = document.querySelector("#purchase-review-dialog");
 const purchaseReviewsList = document.querySelector("#purchase-reviews-list");
 const purchaseReviewsFeedback = document.querySelector("#purchase-reviews-feedback");
+const shoppingReviewAverage = document.querySelector("#shopping-review-average");
+const shoppingReviewCount = document.querySelector("#shopping-review-count");
 const cartItems = document.querySelector("#cart-items");
 const cartEmpty = document.querySelector("#cart-empty");
 const cartCount = document.querySelector("#cart-count");
@@ -649,10 +651,6 @@ function getOrderStatusLabel(status) {
 	}[status] || "Pedido";
 }
 
-function getLocalDateInputValue(date) {
-	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
 function createOrderReviewForm(order) {
 	const form = document.createElement("form");
 	form.className = "purchase-review-form";
@@ -661,23 +659,10 @@ function createOrderReviewForm(order) {
 
 	const heading = document.createElement("h3");
 	heading.textContent = order.review ? "Tu reseña" : "¿Cómo fue tu experiencia?";
-	const dateLabel = document.createElement("label");
-	dateLabel.className = "sales-review-label";
-	dateLabel.textContent = "¿Qué día recibiste tu pedido?";
-	const dateInput = document.createElement("input");
-	dateInput.className = "sales-review-date";
-	dateInput.type = "date";
-	dateInput.name = "receivedAt";
-	dateInput.min = getLocalDateInputValue(new Date(order.createdAt));
-	dateInput.max = getLocalDateInputValue(new Date());
-	dateInput.value = order.review?.receivedAt || "";
-	dateInput.required = true;
-	dateLabel.append(dateInput);
-
 	const ratingFieldset = document.createElement("fieldset");
 	ratingFieldset.className = "sales-review-rating";
 	const ratingLegend = document.createElement("legend");
-	ratingLegend.textContent = "Califica tu experiencia";
+	ratingLegend.textContent = "Elige de 1 a 5 estrellas";
 	ratingFieldset.append(ratingLegend);
 	for (let rating = 1; rating <= 5; rating += 1) {
 		const label = document.createElement("label");
@@ -700,7 +685,7 @@ function createOrderReviewForm(order) {
 	}
 
 	const reasonLabel = document.createElement("label");
-	reasonLabel.className = "sales-review-label sales-review-reason";
+	reasonLabel.className = "sales-review-reason";
 	reasonLabel.textContent = "Cuéntanos qué salió mal (obligatorio para 1 o 2 estrellas)";
 	const reasonInput = document.createElement("textarea");
 	reasonInput.name = "reason";
@@ -716,8 +701,22 @@ function createOrderReviewForm(order) {
 	submit.className = "primary-button";
 	submit.type = "submit";
 	submit.textContent = order.review ? "Actualizar reseña" : "Guardar reseña";
-	form.append(heading, dateLabel, ratingFieldset, reasonLabel, submit);
+	form.append(heading, ratingFieldset, reasonLabel, submit);
 	return form;
+}
+
+function renderShoppingReviewSummary() {
+	const reviews = orders
+		.map((order) => order.review)
+		.filter((review) => review && Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5);
+	if (reviews.length === 0) {
+		shoppingReviewAverage.textContent = "—";
+		shoppingReviewCount.textContent = "Aún sin reseñas";
+		return;
+	}
+	const average = reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
+	shoppingReviewAverage.textContent = average.toFixed(1);
+	shoppingReviewCount.textContent = `${reviews.length} ${reviews.length === 1 ? "reseña" : "reseñas"}`;
 }
 
 function renderPurchaseReviews(orderId) {
@@ -2253,7 +2252,6 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 	}
 	const previousReview = order.review;
 	order.review = {
-		receivedAt: form.elements.receivedAt.value,
 		rating,
 		reason: rating <= 2 ? reason : ""
 	};
@@ -2267,6 +2265,7 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 		return;
 	}
 	purchaseReviewsFeedback.textContent = `Reseña de ${getOrderDisplayId(order)} guardada. Gracias por compartir tu experiencia.`;
+	renderShoppingReviewSummary();
 	renderPurchaseReviews(order.id);
 });
 window.addEventListener("storage", (event) => {
@@ -2432,6 +2431,7 @@ document.querySelector("#sales-date").textContent = new Intl.DateTimeFormat("es"
 renderProducts();
 renderCart();
 renderSales();
+renderShoppingReviewSummary();
 configureProductFormMode();
 window.setInterval(() => {
 	if (document.visibilityState === "visible") {
