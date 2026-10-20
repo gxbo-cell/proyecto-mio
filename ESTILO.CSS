@@ -450,7 +450,9 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 }
 
 @media (max-width: 650px) {
-	.topbar { height: 60px; padding: 0 14px; gap: 8px; }
+	.topbar { height: auto; min-height: 60px; flex-wrap: wrap; padding: 8px 14px; gap: 7px 8px; }
+	.view-switch { order: 3; flex: 1 0 100%; justify-content: center; }
+	.account-actions { margin-left: auto; }
 	.page-shell { width: calc(100% - 36px); }
 	.sales-orders-panel { padding: 17px 14px; }
 	.sales-order-card { padding: 14px 12px 12px; }
@@ -506,7 +508,7 @@ td:first-child { max-width: 155px; overflow: hidden; color: var(--ink); font-wei
 }
 
 @media (max-width: 390px) {
-	.topbar { padding: 0 12px; }
+	.topbar { padding: 8px 12px; }
 	.brand { gap: 6px; font-size: 14px; }
 	.brand-mark { width: 27px; height: 27px; }
 	.view-switch-button { padding: 0 6px; font-size: 9px; }
