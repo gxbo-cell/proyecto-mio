@@ -2140,7 +2140,7 @@ async function completePurchase(paymentMethod) {
 	openPurchaseReviewDialog(order.id);
 }
 
-productForm.addEventListener("submit", (event) => {
+productForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	const name = productNameInput.value.trim();
 	const price = Number(productPriceInput.value);
@@ -2190,8 +2190,15 @@ productForm.addEventListener("submit", (event) => {
 			stock
 		});
 	}
+	const savedProduct = editedProduct || products[products.length - 1];
+	try {
+		await saveProduct(savedProduct);
+	} catch (error) {
+		showFeedback(`No se pudo guardar el producto: ${getBackendError(error)}`, true);
+		await refreshStoreData();
+		return;
+	}
 	lastSuggestedProductCategory = null;
-	saveProducts();
 	productForm.reset();
 	productCategoryHint.textContent = "";
 	configureProductFormMode();
