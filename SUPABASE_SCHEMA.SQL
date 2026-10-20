@@ -150,7 +150,7 @@ begin
 			power(sin(radians(v_latitude - 10.4806) / 2), 2) +
 			cos(radians(10.4806)) * cos(radians(v_latitude)) *
 			power(sin(radians(v_longitude - (-66.9036)) / 2), 2)
-		)));
+		))));
 		v_zone := greatest(1, ceil(v_distance_km / 5)::integer);
 		v_delivery := jsonb_build_object(
 			'location', trim(p_delivery->>'location'),

@@ -257,6 +257,7 @@ async function refreshStoreData() {
 		renderProducts();
 		renderCart();
 		renderSales();
+		catalogFeedback.textContent = "";
 		if (activeReviewOrderId && purchaseReviewDialog.open) {
 			renderPurchaseReviews(activeReviewOrderId);
 		}
@@ -368,6 +369,16 @@ async function applySession(session) {
 		isStoreAdmin = data === true;
 	}
 	updateAccountInterface();
+	if (!isStoreAdmin) {
+		document.querySelectorAll(".view-switch-button").forEach((button) => {
+			const active = button.dataset.viewTarget === "shopping-view";
+			button.classList.toggle("active", active);
+			button.setAttribute("aria-pressed", String(active));
+		});
+		document.querySelectorAll(".app-view").forEach((view) => {
+			view.hidden = view.id !== "shopping-view";
+		});
+	}
 	await refreshStoreData();
 }
 
@@ -2600,7 +2611,6 @@ configureProductFormMode();
 window.setInterval(() => {
 	if (document.visibilityState === "visible") {
 		loadDailyRate();
-		initializeBackend();
 	}
 }, RATE_REFRESH_INTERVAL_MS);
 document.addEventListener("visibilitychange", () => {
@@ -2608,4 +2618,9 @@ document.addEventListener("visibilitychange", () => {
 		loadDailyRate();
 	}
 });
+renderProducts();
+renderCart();
+renderSales();
+renderShoppingReviewSummary();
 loadDailyRate();
+initializeBackend();
