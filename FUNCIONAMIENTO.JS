@@ -212,6 +212,14 @@ function mapOrder(row) {
 	};
 }
 
+function mapReturnedOrder(data) {
+	const row = Array.isArray(data) ? data[0] : data;
+	if (!row) {
+		throw new Error("La tienda no devolvió los datos del pedido.");
+	}
+	return mapOrder(row);
+}
+
 async function loadProducts() {
 	const { data, error } = await supabaseClient.from("products").select("*").order("name");
 	if (error) {
@@ -2145,7 +2153,7 @@ async function completePurchase(paymentMethod) {
 		checkoutFeedback.textContent = `No se pudo confirmar el pedido: ${getBackendError(result.error)}`;
 		return;
 	}
-	const order = mapOrder(result.data);
+	const order = mapReturnedOrder(result.data);
 	const total = order.total;
 	orders.unshift(order);
 
@@ -2379,7 +2387,7 @@ purchaseReviewsList.addEventListener("click", (event) => {
 			purchaseReviewsFeedback.textContent = `No se pudo confirmar la recepción: ${getBackendError(error)}`;
 			return;
 		}
-		const updatedOrder = mapOrder(data);
+		const updatedOrder = mapReturnedOrder(data);
 		orders = orders.map((entry) => entry.id === updatedOrder.id ? updatedOrder : entry);
 		purchaseReviewsFeedback.textContent = "¡Gracias! Ahora cuéntanos cómo fue tu experiencia.";
 		renderPurchaseReviews(order.id);
@@ -2432,7 +2440,7 @@ purchaseReviewsList.addEventListener("submit", async (event) => {
 		purchaseReviewsFeedback.textContent = `No se pudo guardar la reseña: ${getBackendError(result.error)}`;
 		return;
 	}
-	const updatedOrder = mapOrder(result.data);
+	const updatedOrder = mapReturnedOrder(result.data);
 	orders = orders.map((entry) => entry.id === updatedOrder.id ? updatedOrder : entry);
 	renderShoppingReviewSummary();
 	purchaseReviewDialog.close();
