@@ -696,7 +696,7 @@ function createOrderReviewForm(order) {
 
 	const reasonLabel = document.createElement("label");
 	reasonLabel.className = "sales-review-reason";
-	reasonLabel.textContent = "Cuéntanos qué salió mal (obligatorio para 1 o 2 estrellas)";
+	reasonLabel.textContent = "Cuéntanos qué salió mal (obligatorio para las 2 caritas más negativas)";
 	const reasonInput = document.createElement("textarea");
 	reasonInput.name = "reason";
 	reasonInput.rows = 3;
@@ -718,9 +718,9 @@ function createOrderReviewForm(order) {
 function createSavedReviewMessage(review) {
 	const message = document.createElement("div");
 	message.className = "purchase-review-saved";
-	const stars = document.createElement("div");
-	stars.className = "purchase-review-saved-stars";
-	stars.setAttribute("aria-label", `Calificación: ${review.rating} de 5 estrellas`);
+	const faces = document.createElement("div");
+	faces.className = "purchase-review-saved-faces";
+	faces.setAttribute("aria-label", `Calificación de ${review.rating} de 5`);
 	for (let rating = 1; rating <= 5; rating += 1) {
 		const face = document.createElement("span");
 		face.setAttribute("aria-hidden", "true");
@@ -728,12 +728,12 @@ function createSavedReviewMessage(review) {
 		if (rating === review.rating) {
 			face.classList.add("selected");
 		}
-		stars.append(face);
+		faces.append(face);
 	}
 	const thankYou = document.createElement("p");
 	thankYou.className = "purchase-review-thank-you";
 	thankYou.textContent = "¡Muchas gracias por compartir tu experiencia! Tu opinión hace crecer a La Tiendita.";
-	message.append(stars, thankYou);
+	message.append(faces, thankYou);
 	return message;
 }
 
@@ -2285,7 +2285,7 @@ purchaseReviewsList.addEventListener("submit", (event) => {
 	const rating = Number(form.querySelector('input[name^="rating-"]:checked')?.value);
 	const reason = form.elements.reason.value.trim();
 	if (!Number.isInteger(rating) || rating < 1 || rating > 5 || (rating <= 2 && !reason)) {
-		purchaseReviewsFeedback.textContent = "Selecciona de 1 a 5 estrellas y explica las calificaciones de 1 o 2 estrellas.";
+		purchaseReviewsFeedback.textContent = "Elige una carita y explica las 2 calificaciones más negativas.";
 		return;
 	}
 	order.review = {
