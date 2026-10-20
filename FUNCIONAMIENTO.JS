@@ -412,6 +412,9 @@ async function initializeBackend() {
 			.on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
 				refreshStoreData();
 			})
+			.on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+				refreshStoreData();
+			})
 			.subscribe();
 	} catch (error) {
 		catalogFeedback.textContent = `No se pudo conectar con la tienda: ${getBackendError(error)}`;
@@ -1122,7 +1125,6 @@ async function updateProductStock(productId, requestedStock) {
 		} else {
 			showFeedback(`${product.name}: existencias actualizadas a ${stock}.`);
 		}
-		await loadProducts();
 		renderProducts();
 		renderCart();
 	} catch (error) {

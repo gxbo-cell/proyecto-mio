@@ -306,14 +306,19 @@ grant execute on function public.admin_update_store_order_status(uuid, text) to 
 
 do $$
 begin
-	if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
-		and not exists (
+	if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+		if not exists (
 			select 1 from pg_publication_tables
-			where pubname = 'supabase_realtime'
-				and schemaname = 'public'
-				and tablename = 'orders'
+			where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'orders'
 		) then
-		alter publication supabase_realtime add table public.orders;
+			alter publication supabase_realtime add table public.orders;
+		end if;
+		if not exists (
+			select 1 from pg_publication_tables
+			where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'products'
+		) then
+			alter publication supabase_realtime add table public.products;
+		end if;
 	end if;
 end;
 $$;
