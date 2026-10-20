@@ -55,6 +55,9 @@ const stockAlert = document.querySelector("#stock-alert");
 const catalogFeedback = document.querySelector("#catalog-feedback");
 const purchaseMessage = document.querySelector("#purchase-message");
 const purchaseTotal = document.querySelector("#purchase-total");
+const purchaseReviewsPanel = document.querySelector("#purchase-reviews");
+const purchaseReviewsList = document.querySelector("#purchase-reviews-list");
+const purchaseReviewsFeedback = document.querySelector("#purchase-reviews-feedback");
 const cartItems = document.querySelector("#cart-items");
 const cartEmpty = document.querySelector("#cart-empty");
 const cartCount = document.querySelector("#cart-count");
@@ -652,7 +655,7 @@ function getLocalDateInputValue(date) {
 
 function createOrderReviewForm(order) {
 	const form = document.createElement("form");
-	form.className = "sales-order-review";
+	form.className = "purchase-review-form";
 	form.dataset.orderReview = "";
 	form.dataset.orderId = order.id;
 
@@ -717,7 +720,38 @@ function createOrderReviewForm(order) {
 	return form;
 }
 
+function renderPurchaseReviews() {
+	const completedOrders = orders.filter((order) => order.status === "completed");
+	purchaseReviewsPanel.hidden = completedOrders.length === 0;
+	purchaseReviewsList.replaceChildren();
+	for (const order of completedOrders) {
+		const card = document.createElement("article");
+		card.className = "sales-order-card purchase-review-card";
+		const header = document.createElement("div");
+		header.className = "sales-order-header";
+		const heading = document.createElement("div");
+		heading.className = "sales-order-heading";
+		const id = document.createElement("strong");
+		id.className = "sales-order-id";
+		id.textContent = `Pedido ${getOrderDisplayId(order)}`;
+		const timestamp = document.createElement("time");
+		timestamp.className = "sales-order-time";
+		timestamp.dateTime = order.createdAt;
+		timestamp.textContent = `Compra del ${new Intl.DateTimeFormat("es-VE", {
+			day: "numeric", month: "short", year: "numeric"
+		}).format(new Date(order.createdAt))}`;
+		heading.append(id, timestamp);
+		const status = document.createElement("span");
+		status.className = "sales-order-status status-completed";
+		status.textContent = "Completado";
+		header.append(heading, status);
+		card.append(header, createOrderReviewForm(order));
+		purchaseReviewsList.append(card);
+	}
+}
+
 function renderSales() {
+	renderPurchaseReviews();
 	const pendingOrders = orders.filter((order) => order.status === "pending");
 	const acceptedOrders = orders.filter((order) => order.status === "accepted");
 	const completedOrders = orders.filter((order) => order.status === "completed");
@@ -813,9 +847,6 @@ function renderSales() {
 			address.className = "sales-order-address";
 			address.textContent = `Entrega: ${order.delivery.location}`;
 			card.append(address);
-		}
-		if (order.status === "completed") {
-			card.append(createOrderReviewForm(order));
 		}
 		card.append(footer);
 		salesOrdersList.append(card);
@@ -2121,7 +2152,7 @@ salesOrdersList.addEventListener("click", (event) => {
 		updateOrderStatus(button.dataset.orderId, nextStatus);
 	}
 });
-salesOrdersList.addEventListener("change", (event) => {
+purchaseReviewsList.addEventListener("change", (event) => {
 	if (!event.target.matches(".sales-review-rating input")) {
 		return;
 	}
@@ -2135,7 +2166,7 @@ salesOrdersList.addEventListener("change", (event) => {
 	reasonLabel.hidden = !isNegative;
 	reasonInput.required = isNegative;
 });
-salesOrdersList.addEventListener("submit", (event) => {
+purchaseReviewsList.addEventListener("submit", (event) => {
 	const form = event.target.closest("[data-order-review]");
 	if (!form) {
 		return;
@@ -2146,13 +2177,13 @@ salesOrdersList.addEventListener("submit", (event) => {
 	}
 	const order = orders.find((entry) => entry.id === form.dataset.orderId);
 	if (!order || order.status !== "completed") {
-		salesFeedback.textContent = "Solo puedes reseñar un pedido completado.";
+		purchaseReviewsFeedback.textContent = "Solo puedes reseñar un pedido completado.";
 		return;
 	}
 	const rating = Number(form.querySelector('input[name^="rating-"]:checked')?.value);
 	const reason = form.elements.reason.value.trim();
 	if (!Number.isInteger(rating) || rating < 1 || rating > 5 || (rating <= 2 && !reason)) {
-		salesFeedback.textContent = "Selecciona de 1 a 5 estrellas y explica las calificaciones de 1 o 2 estrellas.";
+		purchaseReviewsFeedback.textContent = "Selecciona de 1 a 5 estrellas y explica las calificaciones de 1 o 2 estrellas.";
 		return;
 	}
 	const previousReview = order.review;
@@ -2167,11 +2198,11 @@ salesOrdersList.addEventListener("submit", (event) => {
 		} else {
 			delete order.review;
 		}
-		salesFeedback.textContent = "No se pudo guardar la reseña en este navegador. Inténtalo de nuevo.";
+		purchaseReviewsFeedback.textContent = "No se pudo guardar la reseña en este navegador. Inténtalo de nuevo.";
 		return;
 	}
-	salesFeedback.textContent = `Reseña de ${getOrderDisplayId(order)} guardada. Gracias por compartir tu experiencia.`;
-	renderSales();
+	purchaseReviewsFeedback.textContent = `Reseña de ${getOrderDisplayId(order)} guardada. Gracias por compartir tu experiencia.`;
+	renderPurchaseReviews();
 });
 window.addEventListener("storage", (event) => {
 	if (event.key === ORDER_STORAGE_KEY) {
