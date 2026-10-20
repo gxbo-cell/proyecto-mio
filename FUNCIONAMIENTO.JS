@@ -335,16 +335,19 @@ function renderExchangeRate(prefix = "Fecha valor · ") {
 }
 
 async function refreshReviewSummary() {
-	const { data, error } = await supabaseClient.rpc("get_store_review_summary");
-	if (error) {
+	try {
+		const { data, error } = await supabaseClient.rpc("get_store_review_summary");
+		if (error) {
+			throw error;
+		}
+		const summary = Array.isArray(data) ? data[0] : data;
+		const count = Number(summary?.review_count || 0);
+		shoppingReviewAverage.textContent = count ? Number(summary.average_rating).toFixed(1) : "—";
+		shoppingReviewCount.textContent = count ? `${count} ${count === 1 ? "reseña" : "reseñas"}` : "Aún sin reseñas";
+	} catch {
 		shoppingReviewAverage.textContent = "—";
 		shoppingReviewCount.textContent = "Reseñas no disponibles";
-		return;
 	}
-	const summary = Array.isArray(data) ? data[0] : data;
-	const count = Number(summary?.review_count || 0);
-	shoppingReviewAverage.textContent = count ? Number(summary.average_rating).toFixed(1) : "—";
-	shoppingReviewCount.textContent = count ? `${count} ${count === 1 ? "reseña" : "reseñas"}` : "Aún sin reseñas";
 }
 
 function updateAccountInterface() {
@@ -1052,11 +1055,15 @@ async function updateOrderStatus(orderId, nextStatus) {
 		return;
 	}
 
-	const { error } = await supabaseClient.rpc("admin_update_store_order_status", {
-		p_order_id: orderId,
-		p_next_status: nextStatus
-	});
-	if (error) {
+	try {
+		const { error } = await supabaseClient.rpc("admin_update_store_order_status", {
+			p_order_id: orderId,
+			p_next_status: nextStatus
+		});
+		if (error) {
+			throw error;
+		}
+	} catch (error) {
 		salesFeedback.textContent = `No se pudo actualizar ${getOrderDisplayId(order)}: ${getBackendError(error)}`;
 		return;
 	}
@@ -2121,17 +2128,24 @@ async function completePurchase(paymentMethod) {
 		latitude: deliveryCoordinates.latitude,
 		longitude: deliveryCoordinates.longitude
 	} : null;
-	const { data, error } = await supabaseClient.rpc("place_store_order", {
-		p_items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-		p_payment_method: paymentMethod,
-		p_delivery: delivery
-	});
-	confirmButton.disabled = false;
-	if (error) {
+	let result;
+	try {
+		result = await supabaseClient.rpc("place_store_order", {
+			p_items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+			p_payment_method: paymentMethod,
+			p_delivery: delivery
+		});
+	} catch (error) {
+		confirmButton.disabled = false;
 		checkoutFeedback.textContent = `No se pudo confirmar el pedido: ${getBackendError(error)}`;
 		return;
 	}
-	const order = mapOrder(data);
+	confirmButton.disabled = false;
+	if (result.error) {
+		checkoutFeedback.textContent = `No se pudo confirmar el pedido: ${getBackendError(result.error)}`;
+		return;
+	}
+	const order = mapOrder(result.data);
 	const total = order.total;
 	orders.unshift(order);
 
@@ -2313,7 +2327,11 @@ document.querySelector("#close-purchase-review").addEventListener("click", () =>
 purchaseReviewDialog.addEventListener("click", (event) => {
 	if (event.target === purchaseReviewDialog) {
 		purchaseReviewDialog.close();
+		activeReviewOrderId = null;
 	}
+});
+purchaseReviewDialog.addEventListener("close", () => {
+	activeReviewOrderId = null;
 });
 salesStatusFilter.addEventListener("change", renderSales);
 salesOrdersList.addEventListener("click", (event) => {
@@ -2397,17 +2415,24 @@ purchaseReviewsList.addEventListener("submit", async (event) => {
 	}
 	const submitButton = form.querySelector('button[type="submit"]');
 	submitButton.disabled = true;
-	const { data, error } = await supabaseClient.rpc("submit_store_order_review", {
-		p_order_id: order.id,
-		p_rating: rating,
-		p_reason: reason
-	});
-	submitButton.disabled = false;
-	if (error) {
+	let result;
+	try {
+		result = await supabaseClient.rpc("submit_store_order_review", {
+			p_order_id: order.id,
+			p_rating: rating,
+			p_reason: reason
+		});
+	} catch (error) {
+		submitButton.disabled = false;
 		purchaseReviewsFeedback.textContent = `No se pudo guardar la reseña: ${getBackendError(error)}`;
 		return;
 	}
-	const updatedOrder = mapOrder(data);
+	submitButton.disabled = false;
+	if (result.error) {
+		purchaseReviewsFeedback.textContent = `No se pudo guardar la reseña: ${getBackendError(result.error)}`;
+		return;
+	}
+	const updatedOrder = mapOrder(result.data);
 	orders = orders.map((entry) => entry.id === updatedOrder.id ? updatedOrder : entry);
 	renderShoppingReviewSummary();
 	purchaseReviewDialog.close();
@@ -2553,8 +2578,12 @@ accountForm.addEventListener("submit", async (event) => {
 	}
 });
 signOutButton.addEventListener("click", async () => {
-	const { error } = await supabaseClient.auth.signOut();
-	if (error) {
+	try {
+		const { error } = await supabaseClient.auth.signOut();
+		if (error) {
+			throw error;
+		}
+	} catch (error) {
 		catalogFeedback.textContent = `No se pudo cerrar sesión: ${getBackendError(error)}`;
 	}
 });

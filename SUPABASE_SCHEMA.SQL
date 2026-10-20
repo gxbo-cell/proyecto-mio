@@ -287,6 +287,7 @@ drop policy if exists "Customers and admins read orders" on public.orders;
 create policy "Customers and admins read orders" on public.orders
 	for select to authenticated
 	using (user_id = (select auth.uid()) or (select public.is_store_admin()));
+drop policy if exists "Admins update orders" on public.orders;
 revoke all on public.admin_users from anon, authenticated;
 grant select on public.products to anon, authenticated;
 grant insert, update, delete on public.products to authenticated;
