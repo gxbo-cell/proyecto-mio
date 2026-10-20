@@ -2552,6 +2552,10 @@ document.querySelector("#account-mode-toggle").addEventListener("click", (event)
 accountForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	accountFeedback.textContent = "";
+	if (!supabaseClient) {
+		accountFeedback.textContent = "La tienda todavía no está configurada. Inténtalo nuevamente cuando se active el servicio.";
+		return;
+	}
 	const submitButton = accountForm.querySelector('button[type="submit"]');
 	submitButton.disabled = true;
 	const credentials = {

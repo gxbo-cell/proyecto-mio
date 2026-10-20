@@ -94,6 +94,9 @@ begin
 	if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
 		raise exception 'El carrito está vacío.';
 	end if;
+	if jsonb_array_length(p_items) > 100 then
+		raise exception 'El pedido supera el límite de productos permitido.';
+	end if;
 
 	for v_item in select value from jsonb_array_elements(p_items)
 	loop
