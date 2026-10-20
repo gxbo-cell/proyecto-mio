@@ -660,10 +660,10 @@ function createOrderReviewForm(order) {
 	form.dataset.orderId = order.id;
 
 	const heading = document.createElement("h3");
-	heading.textContent = order.review ? "Tu reseña" : "¿Cuándo recibiste tu pedido?";
+	heading.textContent = order.review ? "Tu reseña" : "¡Qué bueno que llegó! ¿Cómo fue tu experiencia?";
 	const dateLabel = document.createElement("label");
 	dateLabel.className = "sales-review-label";
-	dateLabel.textContent = "Fecha de recepción";
+	dateLabel.textContent = "¿Qué día recibiste tu pedido?";
 	const dateInput = document.createElement("input");
 	dateInput.className = "sales-review-date";
 	dateInput.type = "date";
@@ -745,7 +745,27 @@ function renderPurchaseReviews() {
 		status.className = "sales-order-status status-completed";
 		status.textContent = "Completado";
 		header.append(heading, status);
-		card.append(header, createOrderReviewForm(order));
+		card.append(header);
+		if (order.receivedConfirmed || order.review) {
+			card.append(createOrderReviewForm(order));
+		} else {
+			const prompt = document.createElement("div");
+			prompt.className = "purchase-received-prompt";
+			const message = document.createElement("p");
+			message.textContent = "Tu pedido ya fue confirmado por la tienda. Cuando lo tengas contigo, avísanos y déjanos tu reseña.";
+			const receivedButton = document.createElement("button");
+			receivedButton.className = "purchase-received-button";
+			receivedButton.type = "button";
+			receivedButton.dataset.receivedOrderId = order.id;
+			receivedButton.setAttribute("aria-label", `Confirmar recepción del pedido ${getOrderDisplayId(order)}`);
+			const checkmark = document.createElement("span");
+			checkmark.className = "purchase-received-check";
+			checkmark.setAttribute("aria-hidden", "true");
+			checkmark.textContent = "✓";
+			receivedButton.append(checkmark, document.createTextNode("Ya recibí mi pedido"));
+			prompt.append(message, receivedButton);
+			card.append(prompt);
+		}
 		purchaseReviewsList.append(card);
 	}
 }
@@ -2165,6 +2185,30 @@ purchaseReviewsList.addEventListener("change", (event) => {
 	});
 	reasonLabel.hidden = !isNegative;
 	reasonInput.required = isNegative;
+});
+purchaseReviewsList.addEventListener("click", (event) => {
+	const button = event.target.closest("[data-received-order-id]");
+	if (!button) {
+		return;
+	}
+	const order = orders.find((entry) => entry.id === button.dataset.receivedOrderId);
+	if (!order || order.status !== "completed") {
+		purchaseReviewsFeedback.textContent = "Solo puedes confirmar la recepción de un pedido completado.";
+		return;
+	}
+	const previousValue = order.receivedConfirmed;
+	order.receivedConfirmed = true;
+	if (!saveOrders()) {
+		if (previousValue === undefined) {
+			delete order.receivedConfirmed;
+		} else {
+			order.receivedConfirmed = previousValue;
+		}
+		purchaseReviewsFeedback.textContent = "No se pudo guardar la confirmación en este navegador. Inténtalo de nuevo.";
+		return;
+	}
+	purchaseReviewsFeedback.textContent = "¡Excelente! Ahora cuéntanos cómo fue tu experiencia.";
+	renderPurchaseReviews();
 });
 purchaseReviewsList.addEventListener("submit", (event) => {
 	const form = event.target.closest("[data-order-review]");
