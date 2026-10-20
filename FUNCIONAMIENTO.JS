@@ -55,9 +55,12 @@ const stockAlert = document.querySelector("#stock-alert");
 const catalogFeedback = document.querySelector("#catalog-feedback");
 const purchaseMessage = document.querySelector("#purchase-message");
 const purchaseTotal = document.querySelector("#purchase-total");
-const purchaseReviewsPanel = document.querySelector("#purchase-reviews");
+const purchaseReviewDialog = document.querySelector("#purchase-review-dialog");
 const purchaseReviewsList = document.querySelector("#purchase-reviews-list");
 const purchaseReviewsFeedback = document.querySelector("#purchase-reviews-feedback");
+const reviewsSummaryText = document.querySelector("#reviews-summary-text");
+const reviewsDialogAverage = document.querySelector("#reviews-dialog-average");
+const reviewsDialogCount = document.querySelector("#reviews-dialog-count");
 const cartItems = document.querySelector("#cart-items");
 const cartEmpty = document.querySelector("#cart-empty");
 const cartCount = document.querySelector("#cart-count");
@@ -721,10 +724,9 @@ function createOrderReviewForm(order) {
 }
 
 function renderPurchaseReviews() {
-	const completedOrders = orders.filter((order) => order.status === "completed");
-	purchaseReviewsPanel.hidden = completedOrders.length === 0;
+	const reviewableOrders = orders.filter((order) => order.status !== "rejected");
 	purchaseReviewsList.replaceChildren();
-	for (const order of completedOrders) {
+	for (const order of reviewableOrders) {
 		const card = document.createElement("article");
 		card.className = "sales-order-card purchase-review-card";
 		const header = document.createElement("div");
@@ -737,13 +739,13 @@ function renderPurchaseReviews() {
 		const timestamp = document.createElement("time");
 		timestamp.className = "sales-order-time";
 		timestamp.dateTime = order.createdAt;
-		timestamp.textContent = `Compra del ${new Intl.DateTimeFormat("es-VE", {
+		timestamp.textContent = `${getOrderStatusLabel(order.status)} · ${new Intl.DateTimeFormat("es-VE", {
 			day: "numeric", month: "short", year: "numeric"
 		}).format(new Date(order.createdAt))}`;
 		heading.append(id, timestamp);
 		const status = document.createElement("span");
-		status.className = "sales-order-status status-completed";
-		status.textContent = "Completado";
+		status.className = `sales-order-status status-${order.status}`;
+		status.textContent = order.review ? "Reseñado" : getOrderStatusLabel(order.status);
 		header.append(heading, status);
 		card.append(header);
 		if (order.receivedConfirmed || order.review) {
@@ -752,7 +754,7 @@ function renderPurchaseReviews() {
 			const prompt = document.createElement("div");
 			prompt.className = "purchase-received-prompt";
 			const message = document.createElement("p");
-			message.textContent = "Tu pedido ya fue confirmado por la tienda. Cuando lo tengas contigo, avísanos y déjanos tu reseña.";
+			message.textContent = "Cuando tengas el pedido contigo, confírmanos la recepción para dejar tu reseña.";
 			const receivedButton = document.createElement("button");
 			receivedButton.className = "purchase-received-button";
 			receivedButton.type = "button";
@@ -768,6 +770,26 @@ function renderPurchaseReviews() {
 		}
 		purchaseReviewsList.append(card);
 	}
+	if (reviewableOrders.length === 0) {
+		const empty = document.createElement("p");
+		empty.className = "purchase-reviews-empty";
+		empty.textContent = "Tus pedidos y reseñas aparecerán aquí al finalizar una compra.";
+		purchaseReviewsList.append(empty);
+	}
+	const reviews = orders
+		.map((order) => order.review)
+		.filter((review) => review && Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5);
+	const average = reviews.length
+		? reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
+		: 0;
+	const formattedAverage = average.toFixed(1);
+	reviewsSummaryText.textContent = reviews.length
+		? `${formattedAverage} · ${reviews.length} ${reviews.length === 1 ? "reseña" : "reseñas"}`
+		: "Sin reseñas";
+	reviewsDialogAverage.textContent = formattedAverage;
+	reviewsDialogCount.textContent = reviews.length
+		? `${reviews.length} ${reviews.length === 1 ? "reseña de compra" : "reseñas de compras"}`
+		: "Aún no hay reseñas";
 }
 
 function renderSales() {
@@ -884,6 +906,21 @@ function createOrderAction(orderId, action, label, className) {
 	button.dataset.orderAction = action;
 	button.textContent = label;
 	return button;
+}
+
+function openPurchaseReviewDialog(orderId = "") {
+	purchaseReviewsFeedback.textContent = "";
+	renderPurchaseReviews();
+	if (orderId) {
+		const orderCard = [...purchaseReviewsList.children].find((card) =>
+			card.querySelector(`[data-order-id="${CSS.escape(orderId)}"]`) ||
+			card.querySelector(`[data-received-order-id="${CSS.escape(orderId)}"]`)
+		);
+		orderCard?.scrollIntoView({ block: "nearest" });
+	}
+	if (!purchaseReviewDialog.open) {
+		purchaseReviewDialog.showModal();
+	}
 }
 
 function updateOrderStatus(orderId, nextStatus) {
