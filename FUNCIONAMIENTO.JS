@@ -2200,6 +2200,11 @@ document.querySelector("#reviews-summary-button").addEventListener("click", () =
 document.querySelector("#close-purchase-review").addEventListener("click", () => {
 	purchaseReviewDialog.close();
 });
+purchaseReviewDialog.addEventListener("click", (event) => {
+	if (event.target === purchaseReviewDialog) {
+		purchaseReviewDialog.close();
+	}
+});
 salesStatusFilter.addEventListener("change", renderSales);
 salesOrdersList.addEventListener("click", (event) => {
 	const button = event.target.closest("[data-order-action]");
