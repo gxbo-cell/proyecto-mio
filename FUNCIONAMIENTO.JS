@@ -685,6 +685,9 @@ function createOrderReviewForm(order) {
 		const star = document.createElement("span");
 		star.setAttribute("aria-hidden", "true");
 		star.textContent = "★";
+		if (order.review?.rating >= rating) {
+			label.classList.add("selected");
+		}
 		label.append(input, star);
 		ratingFieldset.append(label);
 	}
@@ -2122,6 +2125,9 @@ salesOrdersList.addEventListener("change", (event) => {
 	const reasonLabel = form.querySelector(".sales-review-reason");
 	const reasonInput = reasonLabel.querySelector("textarea");
 	const isNegative = Number(event.target.value) <= 2;
+	form.querySelectorAll(".sales-review-star").forEach((star, index) => {
+		star.classList.toggle("selected", index < Number(event.target.value));
+	});
 	reasonLabel.hidden = !isNegative;
 	reasonInput.required = isNegative;
 });
