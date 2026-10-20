@@ -650,7 +650,7 @@ h2 { color: #26332c; font-family: "DM Sans", sans-serif; font-size: 21px; font-w
 .sales-order-footer { margin-top: 14px; }
 .purchase-review-dialog { padding: 24px; border-radius: 15px; }
 .purchase-review-form { padding: 16px; border-radius: 9px; }
-.sales-review-date, .sales-review-reason textarea { border-color: #e3e9e4; border-radius: 7px; }
+.sales-review-reason textarea { border-color: #e3e9e4; border-radius: 7px; }
 .sales-review-reason textarea:focus { outline: 0; border-color: #4e9470; box-shadow: 0 0 0 3px rgba(39, 116, 81, .11); }
 .sales-order-total-wrap span { font-size: 10px; }
 .sales-order-total-wrap strong { font-size: 18px; }
