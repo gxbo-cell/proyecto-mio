@@ -53,6 +53,10 @@ h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 0; font-family: "DM Serif Display", Georgia, serif; font-size: 50px; font-weight: 400; line-height: .99; letter-spacing: 0; }
 h1 span { color: var(--green); }
 .intro-copy { max-width: 290px; margin: 0 0 4px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.shopping-reviews-summary { width: fit-content; display: flex; align-items: center; gap: 9px; margin: 0 0 12px auto; padding: 9px 13px; border: 1px solid #eee7d7; border-radius: 24px; color: #667168; background: #fffefa; box-shadow: 0 3px 10px rgba(29, 48, 37, .035); font-size: 10px; }
+.shopping-reviews-icon { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 50%; color: #a36e15; background: #fff3d8; font-size: 12px; }
+.shopping-reviews-summary strong { color: #29372e; font-size: 13px; }
+.shopping-reviews-stars { color: #e6a83f; letter-spacing: 1px; }
 
 .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid #e7e4db; border-radius: 5px; background: rgba(255, 254, 250, .7); }
 .stat { min-height: 86px; padding: 17px 23px; display: flex; flex-direction: column; justify-content: center; gap: 6px; border-right: 1px solid var(--line); }
@@ -128,7 +132,6 @@ h1 span { color: var(--green); }
 .purchase-received-check { width: 21px; height: 21px; display: grid; place-items: center; border-radius: 50%; color: #176044; background: #fff; font-size: 12px; font-weight: 700; }
 .purchase-review-form { display: grid; gap: 11px; margin-top: 15px; padding: 15px; border: 1px solid #e5eae6; border-radius: 8px; background: #fbfcfb; }
 .purchase-review-form h3 { margin: 0; color: var(--ink); font-size: 13px; }
-.sales-review-label { display: grid; gap: 6px; color: #4b5b50; font-size: 10px; font-weight: 600; }
 .sales-review-reason { display: grid; gap: 6px; color: #4b5b50; font-size: 10px; font-weight: 600; }
 .sales-review-reason textarea { width: 100%; min-height: 76px; padding: 9px 10px; border: 1px solid #e3e9e4; border-radius: 6px; color: var(--ink); background: #fff; font: 11px "DM Sans", sans-serif; }
 .sales-review-reason textarea { resize: vertical; }
@@ -687,6 +690,8 @@ td { border-color: #edf0ed; }
 	.sales-intro { min-height: 0; gap: 12px; margin-top: 16px; padding: 25px 22px; border-radius: 13px; }
 	.sales-intro h1 { font-size: 36px; }
 	.sales-intro .intro-copy { max-width: 300px; margin-bottom: 0; }
+	.shopping-reviews-summary { margin-bottom: 10px; padding: 8px 11px; font-size: 9px; }
+	.shopping-reviews-icon { width: 21px; height: 21px; }
 	.sales-stats { gap: 9px; }
 	.sales-stat { min-height: 105px; padding: 15px 10px 12px 45px; border-radius: 9px; }
 	.sales-stat-icon { width: 25px; height: 25px; top: 15px; left: 11px; }

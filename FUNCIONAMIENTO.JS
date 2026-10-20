@@ -2272,6 +2272,7 @@ window.addEventListener("storage", (event) => {
 	if (event.key === ORDER_STORAGE_KEY) {
 		orders = loadOrders();
 		renderSales();
+		renderShoppingReviewSummary();
 	} else if (event.key === STORAGE_KEY) {
 		products = loadProducts();
 		renderProducts();
