@@ -844,8 +844,17 @@ function renderShoppingReviewSummary() {
 
 function renderPurchaseReviews(orderId) {
 	purchaseReviewsList.replaceChildren();
-	const order = orders.find((entry) => entry.id === orderId && entry.status !== "rejected");
-	if (order) {
+	const matchingOrders = orderId
+		? orders.filter((entry) => entry.id === orderId && entry.status !== "rejected")
+		: orders.filter((entry) => entry.status !== "rejected");
+	if (matchingOrders.length === 0) {
+		const unavailable = document.createElement("p");
+		unavailable.className = "purchase-reviews-empty";
+		unavailable.textContent = "Todavía no tienes pedidos para reseñar.";
+		purchaseReviewsList.append(unavailable);
+		return;
+	}
+	for (const order of matchingOrders) {
 		const card = document.createElement("article");
 		card.className = "sales-order-card purchase-review-card";
 		card.dataset.orderId = order.id;
@@ -891,11 +900,6 @@ function renderPurchaseReviews(orderId) {
 			card.append(prompt);
 		}
 		purchaseReviewsList.append(card);
-	} else {
-		const unavailable = document.createElement("p");
-		unavailable.className = "purchase-reviews-empty";
-		unavailable.textContent = "No se encontró el pedido para reseñar.";
-		purchaseReviewsList.append(unavailable);
 	}
 }
 
