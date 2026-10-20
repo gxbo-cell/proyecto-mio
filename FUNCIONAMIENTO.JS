@@ -837,17 +837,9 @@ function createSavedReviewMessage(review) {
 }
 
 function renderShoppingReviewSummary() {
-	const reviews = orders
-		.map((order) => order.review)
-		.filter((review) => review && Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5);
-	if (reviews.length === 0) {
-		shoppingReviewAverage.textContent = "—";
-		shoppingReviewCount.textContent = "Aún sin reseñas";
-		return;
+	if (supabaseClient) {
+		refreshReviewSummary();
 	}
-	const average = reviews.reduce((total, review) => total + review.rating, 0) / reviews.length;
-	shoppingReviewAverage.textContent = average.toFixed(1);
-	shoppingReviewCount.textContent = `${reviews.length} ${reviews.length === 1 ? "reseña" : "reseñas"}`;
 }
 
 function renderPurchaseReviews(orderId) {
@@ -1023,6 +1015,7 @@ function createOrderAction(orderId, action, label, className) {
 }
 
 function openPurchaseReviewDialog(orderId) {
+	activeReviewOrderId = orderId;
 	purchaseReviewsFeedback.textContent = "";
 	renderPurchaseReviews(orderId);
 	if (!purchaseReviewDialog.open) {
@@ -1030,7 +1023,7 @@ function openPurchaseReviewDialog(orderId) {
 	}
 }
 
-function updateOrderStatus(orderId, nextStatus) {
+async function updateOrderStatus(orderId, nextStatus) {
 	const order = orders.find((entry) => entry.id === orderId);
 	if (!order || !(
 		(order.status === "pending" && ["accepted", "rejected"].includes(nextStatus)) ||
@@ -1039,51 +1032,21 @@ function updateOrderStatus(orderId, nextStatus) {
 		return;
 	}
 
-	const previousStatus = order.status;
-	const previousStocks = [];
-	if (nextStatus === "accepted") {
-		for (const item of order.items) {
-			const product = products.find((entry) => entry.id === item.productId);
-			if (!product || product.stock < item.quantity) {
-				salesFeedback.textContent = `No se pudo aceptar ${getOrderDisplayId(order)}: faltan existencias para ${item.name}. Revisa el inventario.`;
-				return;
-			}
-			previousStocks.push({ product, stock: product.stock });
-		}
-		for (const item of order.items) {
-			products.find((entry) => entry.id === item.productId).stock -= item.quantity;
-		}
-		if (!saveProducts(false)) {
-			for (const { product, stock } of previousStocks) {
-				product.stock = stock;
-			}
-			salesFeedback.textContent = "No se pudo guardar el inventario en este navegador; el pedido sigue pendiente.";
-			return;
-		}
-	}
-
-	order.status = nextStatus;
-	if (!saveOrders()) {
-		order.status = previousStatus;
-		for (const { product, stock } of previousStocks) {
-			product.stock = stock;
-		}
-		if (previousStocks.length > 0) {
-			saveProducts(false);
-		}
-		salesFeedback.textContent = "No se pudo guardar el cambio en este navegador. Inténtalo de nuevo.";
+	const { error } = await supabaseClient.rpc("admin_update_store_order_status", {
+		p_order_id: orderId,
+		p_next_status: nextStatus
+	});
+	if (error) {
+		salesFeedback.textContent = `No se pudo actualizar ${getOrderDisplayId(order)}: ${getBackendError(error)}`;
 		return;
 	}
-
+	await refreshStoreData();
+	const updatedOrder = orders.find((entry) => entry.id === orderId);
 	salesFeedback.textContent = nextStatus === "accepted"
-		? `${getOrderDisplayId(order)} aceptado. El inventario se actualizó.`
+		? `${getOrderDisplayId(updatedOrder || order)} aceptado. El inventario se actualizó.`
 		: nextStatus === "rejected"
-			? `${getOrderDisplayId(order)} rechazado.`
-			: `${getOrderDisplayId(order)} marcado como completado.`;
-	if (nextStatus === "accepted") {
-		renderProducts();
-	}
-	renderSales();
+			? `${getOrderDisplayId(updatedOrder || order)} rechazado.`
+			: `${getOrderDisplayId(updatedOrder || order)} marcado como completado.`;
 }
 
 function beginProductEdit(product) {
@@ -1115,7 +1078,7 @@ function cancelProductEdit() {
 	formFeedback.classList.remove("error");
 }
 
-function updateProductStock(productId, requestedStock) {
+async function updateProductStock(productId, requestedStock) {
 	const product = products.find((item) => item.id === productId);
 	const amount = Number(requestedStock);
 	const weightProduct = product && isWeightProduct(product);
@@ -1139,9 +1102,15 @@ function updateProductStock(productId, requestedStock) {
 	} else {
 		showFeedback(`${product.name}: existencias actualizadas a ${stock}.`);
 	}
-	saveProducts();
-	renderProducts();
-	renderCart();
+	try {
+		await saveProduct(product);
+		await loadProducts();
+		renderProducts();
+		renderCart();
+	} catch (error) {
+		showFeedback(`No se pudo guardar el inventario: ${getBackendError(error)}`, true);
+		await refreshStoreData();
+	}
 }
 
 function deleteProduct(productId) {
@@ -1154,7 +1123,7 @@ function deleteProduct(productId) {
 	deleteConfirmDialog.showModal();
 }
 
-function confirmProductDeletion() {
+async function confirmProductDeletion() {
 	const product = products.find((item) => item.id === pendingDeleteProductId);
 	pendingDeleteProductId = null;
 	deleteConfirmDialog.close();
@@ -1164,9 +1133,14 @@ function confirmProductDeletion() {
 	if (editingProductId === product.id) {
 		cancelProductEdit();
 	}
+	const { error } = await supabaseClient.from("products").delete().eq("id", product.id);
+	if (error) {
+		showFeedback(`No se pudo eliminar el producto: ${getBackendError(error)}`, true);
+		await refreshStoreData();
+		return;
+	}
 	products = products.filter((item) => item.id !== product.id);
 	cart = cart.filter((item) => item.productId !== product.id);
-	saveProducts();
 	showFeedback(`${product.name} fue eliminado del inventario.`);
 	renderProducts();
 	renderCart();
@@ -1322,6 +1296,11 @@ function renderCart() {
 
 function openCheckout() {
 	if (cart.length === 0) {
+		return;
+	}
+	if (!currentUser) {
+		accountFeedback.textContent = "Inicia sesión o crea una cuenta para confirmar tu pedido.";
+		accountDialog.showModal();
 		return;
 	}
 	if (deliveryToggle.checked && !deliveryCoordinates) {
@@ -2102,7 +2081,7 @@ function useCurrentLocation() {
 	}, { enableHighAccuracy: true, timeout: 10000 });
 }
 
-function completePurchase(paymentMethod) {
+async function completePurchase(paymentMethod) {
 	const unavailable = cart.some((item) => {
 		const product = products.find((entry) => entry.id === item.productId);
 		return !product || item.quantity > product.stock;
@@ -2114,33 +2093,26 @@ function completePurchase(paymentMethod) {
 
 	checkoutFeedback.textContent = "";
 	const confirmButton = document.querySelector("#confirm-payment");
-	const total = getOrderTotal();
+	confirmButton.disabled = true;
 	const deliveryLocation = deliveryToggle.checked ? getDeliveryLocation() : "";
-	const order = {
-		id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-		createdAt: new Date().toISOString(),
-		status: "pending",
-		paymentMethod,
-		total,
-		delivery: deliveryLocation ? { location: deliveryLocation, fee: deliveryFee } : null,
-		items: cart.map((item) => {
-			const product = products.find((entry) => entry.id === item.productId);
-			return {
-				productId: product.id,
-				name: product.name,
-				saleMode: product.saleMode,
-				quantity: item.quantity,
-				price: getDiscountedPrice(product.price),
-				lineTotal: getCartLineTotal(product, item.quantity)
-			};
-		})
-	};
-	orders.unshift(order);
-	if (!saveOrders()) {
-		orders.shift();
-		checkoutFeedback.textContent = "No se pudo guardar el pedido en este navegador. La compra sigue en el carrito; inténtalo de nuevo.";
+	const delivery = deliveryLocation ? {
+		location: deliveryLocation,
+		latitude: deliveryCoordinates.latitude,
+		longitude: deliveryCoordinates.longitude
+	} : null;
+	const { data, error } = await supabaseClient.rpc("place_store_order", {
+		p_items: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+		p_payment_method: paymentMethod,
+		p_delivery: delivery
+	});
+	confirmButton.disabled = false;
+	if (error) {
+		checkoutFeedback.textContent = `No se pudo confirmar el pedido: ${getBackendError(error)}`;
 		return;
 	}
+	const order = mapOrder(data);
+	const total = order.total;
+	orders.unshift(order);
 
 	purchaseMessage.textContent = `${getOrderDisplayId(order)} · Por aceptar · ${paymentMethod}`;
 	purchaseTotal.textContent = formatMoney(total);
@@ -2161,7 +2133,6 @@ function completePurchase(paymentMethod) {
 		paymentDetailsDialog.close();
 	}
 	checkoutDialog.close();
-	confirmButton.disabled = false;
 	showFeedback("Pedido enviado a la tienda. Está pendiente de aceptación.");
 	renderCart();
 	renderProducts();
