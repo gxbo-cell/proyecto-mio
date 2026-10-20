@@ -91,7 +91,7 @@ begin
 	if p_payment_method not in ('Efectivo', 'Pago móvil', 'Transferencia') then
 		raise exception 'El método de pago no es válido.';
 	end if;
-	if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+	if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
 		raise exception 'El carrito está vacío.';
 	end if;
 
@@ -271,6 +271,8 @@ alter table public.admin_users enable row level security;
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 
+revoke all on public.admin_users, public.products, public.orders from anon, authenticated;
+
 drop policy if exists "Anyone can read products" on public.products;
 create policy "Anyone can read products" on public.products
 	for select to anon, authenticated using (true);
@@ -284,7 +286,6 @@ create policy "Customers and admins read orders" on public.orders
 	for select to authenticated
 	using (user_id = (select auth.uid()) or (select public.is_store_admin()));
 revoke all on public.admin_users from anon, authenticated;
-revoke insert, update, delete on public.orders from anon, authenticated;
 grant select on public.products to anon, authenticated;
 grant insert, update, delete on public.products to authenticated;
 grant select on public.orders to authenticated;
@@ -314,3 +315,17 @@ drop trigger if exists protect_order_customer_fields on public.orders;
 create trigger protect_order_customer_fields
 	before update on public.orders
 	for each row execute function public.touch_order_review();
+
+do $$
+begin
+	if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+		and not exists (
+			select 1 from pg_publication_tables
+			where pubname = 'supabase_realtime'
+				and schemaname = 'public'
+				and tablename = 'orders'
+		) then
+		alter publication supabase_realtime add table public.orders;
+	end if;
+end;
+$$;
