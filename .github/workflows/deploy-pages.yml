@@ -1,9 +1,16 @@
 name: Deploy La Tiendita to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: Type "yes" only when the store is ready to be public
+        required: true
+        type: choice
+        options:
+          - no
+          - yes
+        default: no
 
 permissions:
   contents: read
@@ -14,6 +21,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ inputs.confirm_deploy == 'yes' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

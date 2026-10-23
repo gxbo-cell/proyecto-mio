@@ -163,15 +163,18 @@
 			<section class="sales-orders-panel" aria-labelledby="sales-orders-title">
 				<div class="sales-orders-heading">
 					<div><p class="eyebrow">CENTRO DE PEDIDOS</p><h2 id="sales-orders-title">Todas las órdenes</h2></div>
-					<label class="sales-filter-wrap" for="sales-status-filter"><span>Ver</span>
-						<select id="sales-status-filter" class="sales-status-filter">
-							<option value="all">Todos los pedidos</option>
-							<option value="pending">Por aceptar</option>
-							<option value="accepted">En preparación</option>
-							<option value="completed">Completados</option>
-							<option value="rejected">Rechazados</option>
-						</select>
-					</label>
+					<div class="sales-order-tools">
+						<label class="search-box sales-search-box" for="sales-search-input"><span class="search-icon" aria-hidden="true">⌕</span><input id="sales-search-input" type="search" placeholder="Buscar pedido o producto" autocomplete="off"></label>
+						<label class="sales-filter-wrap" for="sales-status-filter"><span>Estado</span>
+							<select id="sales-status-filter" class="sales-status-filter">
+								<option value="all">Todos</option>
+								<option value="pending">Por aceptar</option>
+								<option value="accepted">En preparación</option>
+								<option value="completed">Completados</option>
+								<option value="rejected">Rechazados</option>
+							</select>
+						</label>
+					</div>
 				</div>
 				<p id="sales-feedback" class="sales-feedback" role="status" aria-live="polite"></p>
 				<div id="sales-orders-list" class="sales-orders-list"></div>
@@ -217,10 +220,10 @@
 							<option value="all">Todos los productos</option>
 							<option value="available">Con existencias</option>
 							<option value="out">Agotados</option>
-							<option value="low">Stock bajo (1–3)</option>
+							<option value="low">Stock bajo</option>
 						</select>
 					</div>
-					<div class="table-wrap">
+					<div class="table-wrap" role="region" aria-label="Tabla de inventario; desplázate horizontalmente para ver todas las columnas" tabindex="0">
 						<table>
 							<thead><tr><th scope="col">Producto</th><th scope="col">Categoría</th><th scope="col">Precio</th><th scope="col">Existencias (kg / unidades)</th><th scope="col">Estado / acción</th></tr></thead>
 							<tbody id="product-list"></tbody>
@@ -255,6 +258,38 @@
 							<button id="submit-product-button" class="primary-button" type="submit"><span aria-hidden="true">＋</span> Agregar al inventario</button>
 							<button id="cancel-edit-button" class="secondary-button cancel-edit-button" type="button" hidden>Cancelar edición</button>
 							<p id="form-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+						</form>
+					</section>
+					<section class="form-panel payment-settings-panel" aria-labelledby="payment-settings-title">
+						<p class="eyebrow">CONFIGURACIÓN DE COBROS</p>
+						<h2 id="payment-settings-title">Datos de pago</h2>
+						<p class="panel-copy">Completa solo los métodos que ofrecerás. Estos datos se mostrarán públicamente a los compradores; nunca escribas contraseñas ni claves bancarias.</p>
+						<form id="payment-settings-form">
+							<fieldset class="payment-settings-group">
+								<legend>Pago móvil</legend>
+								<label class="field-label" for="mobile-payment-phone">Teléfono</label>
+								<input id="mobile-payment-phone" name="mobilePhone" type="text" maxlength="32" autocomplete="off" placeholder="Ej. 0412-1234567">
+								<label class="field-label" for="mobile-payment-document">Cédula/RIF</label>
+								<input id="mobile-payment-document" name="mobileDocument" type="text" maxlength="32" autocomplete="off" placeholder="Documento del titular">
+								<label class="field-label" for="mobile-payment-bank">Banco</label>
+								<input id="mobile-payment-bank" name="mobileBank" type="text" maxlength="80" autocomplete="off" placeholder="Banco receptor">
+							</fieldset>
+							<fieldset class="payment-settings-group">
+								<legend>Transferencia</legend>
+								<label class="field-label" for="transfer-payment-bank">Banco</label>
+								<input id="transfer-payment-bank" name="transferBank" type="text" maxlength="80" autocomplete="off" placeholder="Banco receptor">
+								<label class="field-label" for="transfer-payment-account">Número de cuenta</label>
+								<input id="transfer-payment-account" name="transferAccount" type="text" maxlength="40" autocomplete="off" placeholder="Cuenta bancaria">
+								<label class="field-label" for="transfer-payment-holder">Titular de la cuenta</label>
+								<input id="transfer-payment-holder" name="transferHolder" type="text" maxlength="100" autocomplete="off" placeholder="Nombre del titular">
+								<label class="field-label" for="transfer-payment-document">Cédula/RIF del titular (opcional)</label>
+								<input id="transfer-payment-document" name="transferDocument" type="text" maxlength="32" autocomplete="off" placeholder="Documento del titular">
+							</fieldset>
+							<label class="field-label" for="cash-payment-instructions">Instrucciones para efectivo</label>
+							<textarea id="cash-payment-instructions" name="cashInstructions" rows="3" maxlength="300">Paga al retirar en tienda o al recibir tu pedido.</textarea>
+							<p class="payment-public-warning">La información bancaria configurada aquí será visible para cualquier visitante en el paso de pago.</p>
+							<button id="save-payment-settings" class="primary-button" type="submit">Guardar datos de pago</button>
+							<p id="payment-settings-feedback" class="form-feedback" role="status" aria-live="polite"></p>
 						</form>
 					</section>
 					<div id="admin-stock-alert" class="stock-alert admin-stock-alert" role="status" aria-live="polite" hidden></div>
@@ -308,8 +343,8 @@
 				<fieldset class="payment-options">
 					<legend class="visually-hidden">Método de pago</legend>
 					<label class="payment-option"><input type="radio" name="payment-method" value="Efectivo" required><span class="payment-symbol" aria-hidden="true">$</span><span class="payment-option-copy"><strong>Efectivo</strong><small>Pago al retirar o recibir el pedido</small></span></label>
-					<label class="payment-option"><input type="radio" name="payment-method" value="Pago móvil" required><span class="payment-symbol" aria-hidden="true">↗</span><span class="payment-option-copy"><strong>Pago móvil</strong><small>Teléfono, cédula y banco</small></span></label>
-					<label class="payment-option"><input type="radio" name="payment-method" value="Transferencia" required><span class="payment-symbol" aria-hidden="true">⇄</span><span class="payment-option-copy"><strong>Transferencia</strong><small>Datos de cuenta bancaria</small></span></label>
+					<label class="payment-option" id="mobile-payment-option"><input type="radio" name="payment-method" value="Pago móvil" required><span class="payment-symbol" aria-hidden="true">↗</span><span class="payment-option-copy"><strong>Pago móvil</strong><small id="mobile-payment-availability">Disponible cuando el comercio complete sus datos.</small></span></label>
+					<label class="payment-option" id="transfer-payment-option"><input type="radio" name="payment-method" value="Transferencia" required><span class="payment-symbol" aria-hidden="true">⇄</span><span class="payment-option-copy"><strong>Transferencia</strong><small id="transfer-payment-availability">Disponible cuando el comercio complete sus datos.</small></span></label>
 				</fieldset>
 				<div id="checkout-delivery" class="checkout-delivery" hidden></div>
 				<div class="dialog-total"><span>Total a pagar</span><span class="cart-total-values"><strong id="checkout-total">$0.00</strong><small id="checkout-total-bs">Tasa en consulta</small></span></div>

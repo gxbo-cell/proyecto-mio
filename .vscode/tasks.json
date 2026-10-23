@@ -2,7 +2,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Auto-push saved project changes",
+			"label": "Manual auto-push watcher",
 			"type": "shell",
 			"command": "powershell.exe",
 			"args": [
@@ -20,7 +20,6 @@
 				"focus": false
 			},
 			"runOptions": {
-				"runOn": "folderOpen",
 				"instanceLimit": 1
 			}
 		}

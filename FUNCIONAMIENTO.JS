@@ -35,6 +35,9 @@ const productPriceLabel = document.querySelector("#product-price-label");
 const productStockLabel = document.querySelector("#product-stock-label");
 const productStockGuidance = document.querySelector("#product-stock-guidance");
 const productList = document.querySelector("#product-list");
+const paymentSettingsForm = document.querySelector("#payment-settings-form");
+const paymentSettingsFeedback = document.querySelector("#payment-settings-feedback");
+const paymentSettingsSaveButton = document.querySelector("#save-payment-settings");
 const catalogProducts = document.querySelector("#catalog-products");
 const emptyState = document.querySelector("#empty-state");
 const noResults = document.querySelector("#no-results");
@@ -90,6 +93,7 @@ const salesEmptyState = document.querySelector("#sales-empty-state");
 const salesFilterEmpty = document.querySelector("#sales-filter-empty");
 const salesFeedback = document.querySelector("#sales-feedback");
 const salesStatusFilter = document.querySelector("#sales-status-filter");
+const salesSearchInput = document.querySelector("#sales-search-input");
 const pendingOrderCount = document.querySelector("#pending-order-count");
 const accountDialog = document.querySelector("#account-dialog");
 const accountForm = document.querySelector("#account-form");
@@ -104,6 +108,16 @@ let supabaseClient = null;
 let currentUser = null;
 let isStoreAdmin = false;
 let isCreatingAccount = false;
+let paymentSettings = {
+	cash_instructions: "Paga al retirar en tienda o al recibir tu pedido.",
+	mobile_phone: "",
+	mobile_document: "",
+	mobile_bank: "",
+	transfer_bank: "",
+	transfer_account_number: "",
+	transfer_account_holder: "",
+	transfer_document: ""
+};
 let activeReviewOrderId = null;
 let cart = [];
 let exchangeRate = loadCachedRate();
@@ -238,6 +252,115 @@ async function loadOrders() {
 		throw error;
 	}
 	orders = data.map(mapOrder);
+}
+
+function isMobilePaymentConfigured(settings = paymentSettings) {
+	return Boolean(settings.mobile_phone?.trim() && settings.mobile_document?.trim() && settings.mobile_bank?.trim());
+}
+
+function isTransferPaymentConfigured(settings = paymentSettings) {
+	return Boolean(settings.transfer_bank?.trim() && settings.transfer_account_number?.trim() && settings.transfer_account_holder?.trim());
+}
+
+function renderPaymentSettingsForm() {
+	const fields = {
+		mobilePhone: paymentSettings.mobile_phone,
+		mobileDocument: paymentSettings.mobile_document,
+		mobileBank: paymentSettings.mobile_bank,
+		transferBank: paymentSettings.transfer_bank,
+		transferAccount: paymentSettings.transfer_account_number,
+		transferHolder: paymentSettings.transfer_account_holder,
+		transferDocument: paymentSettings.transfer_document,
+		cashInstructions: paymentSettings.cash_instructions
+	};
+	for (const [name, value] of Object.entries(fields)) {
+		paymentSettingsForm.elements[name].value = value || "";
+	}
+}
+
+function updatePaymentMethodAvailability() {
+	const mobileReady = isMobilePaymentConfigured();
+	const transferReady = isTransferPaymentConfigured();
+	const mobileInput = document.querySelector('#mobile-payment-option input[name="payment-method"]');
+	const transferInput = document.querySelector('#transfer-payment-option input[name="payment-method"]');
+	mobileInput.disabled = !mobileReady;
+	transferInput.disabled = !transferReady;
+	document.querySelector("#mobile-payment-availability").textContent = mobileReady
+		? "Datos de pago disponibles."
+		: "No disponible todavía; faltan datos del comercio.";
+	document.querySelector("#transfer-payment-availability").textContent = transferReady
+		? "Datos de pago disponibles."
+		: "No disponible todavía; faltan datos del comercio.";
+	document.querySelector("#mobile-payment-option").classList.toggle("payment-option-unavailable", !mobileReady);
+	document.querySelector("#transfer-payment-option").classList.toggle("payment-option-unavailable", !transferReady);
+	if (mobileInput.disabled) {
+		mobileInput.checked = false;
+	}
+	if (transferInput.disabled) {
+		transferInput.checked = false;
+	}
+}
+
+async function refreshPaymentSettings() {
+	try {
+		const { data, error } = await supabaseClient
+			.from("store_payment_settings")
+			.select("*")
+			.eq("id", true)
+			.maybeSingle();
+		if (error) {
+			throw error;
+		}
+		if (!data) {
+			throw new Error("No se encontró la configuración de pagos.");
+		}
+		paymentSettings = {
+			...paymentSettings,
+			...Object.fromEntries(Object.entries(data).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]))
+		};
+		renderPaymentSettingsForm();
+		paymentSettingsFeedback.textContent = "Datos de pago cargados.";
+		paymentSettingsFeedback.classList.remove("error");
+	} catch (error) {
+		paymentSettingsFeedback.textContent = `No se pudo cargar la configuración de pagos: ${getBackendError(error)}. Verifica que ejecutaste la versión actualizada de SUPABASE_SCHEMA.SQL.`;
+		paymentSettingsFeedback.classList.add("error");
+	}
+	updatePaymentMethodAvailability();
+}
+
+async function savePaymentSettings(event) {
+	event.preventDefault();
+	const settings = {
+		id: true,
+		mobile_phone: paymentSettingsForm.elements.mobilePhone.value.trim(),
+		mobile_document: paymentSettingsForm.elements.mobileDocument.value.trim(),
+		mobile_bank: paymentSettingsForm.elements.mobileBank.value.trim(),
+		transfer_bank: paymentSettingsForm.elements.transferBank.value.trim(),
+		transfer_account_number: paymentSettingsForm.elements.transferAccount.value.trim(),
+		transfer_account_holder: paymentSettingsForm.elements.transferHolder.value.trim(),
+		transfer_document: paymentSettingsForm.elements.transferDocument.value.trim(),
+		cash_instructions: paymentSettingsForm.elements.cashInstructions.value.trim() || "Paga al retirar en tienda o al recibir tu pedido.",
+		updated_at: new Date().toISOString()
+	};
+	paymentSettingsFeedback.textContent = "";
+	paymentSettingsFeedback.classList.remove("error");
+	paymentSettingsSaveButton.disabled = true;
+	paymentSettingsSaveButton.textContent = "Guardando...";
+	try {
+		const { error } = await supabaseClient.from("store_payment_settings").upsert(settings, { onConflict: "id" });
+		if (error) {
+			throw error;
+		}
+		paymentSettings = settings;
+		updatePaymentMethodAvailability();
+		paymentSettingsFeedback.textContent = "Datos de pago guardados. Los métodos completos ya están disponibles para los compradores.";
+	} catch (error) {
+		paymentSettingsFeedback.textContent = `No se pudieron guardar los datos de pago: ${getBackendError(error)}`;
+		paymentSettingsFeedback.classList.add("error");
+	} finally {
+		paymentSettingsSaveButton.disabled = false;
+		paymentSettingsSaveButton.textContent = "Guardar datos de pago";
+	}
 }
 
 async function saveProduct(product) {
@@ -380,6 +503,7 @@ async function applySession(session) {
 		isStoreAdmin = data === true;
 	}
 	updateAccountInterface();
+	await refreshPaymentSettings();
 	if (!isStoreAdmin) {
 		document.querySelectorAll(".view-switch-button").forEach((button) => {
 			const active = button.dataset.viewTarget === "shopping-view";
@@ -748,7 +872,18 @@ function renderAdminProducts() {
 		updateButton.className = "inventory-action-button";
 		updateButton.type = "button";
 		updateButton.textContent = "Guardar";
-		updateButton.addEventListener("click", () => updateProductStock(product.id, stockInput.value));
+		updateButton.addEventListener("click", async () => {
+			updateButton.disabled = true;
+			updateButton.textContent = "Guardando...";
+			try {
+				await updateProductStock(product.id, stockInput.value);
+			} finally {
+				if (updateButton.isConnected) {
+					updateButton.disabled = false;
+					updateButton.textContent = "Guardar";
+				}
+			}
+		});
 		const deleteButton = document.createElement("button");
 		deleteButton.className = "inventory-delete-button";
 		deleteButton.type = "button";
@@ -760,7 +895,6 @@ function renderAdminProducts() {
 		productList.append(row);
 	}
 	document.querySelector("#admin-empty-state").hidden = visibleProducts.length > 0;
-	productList.closest(".table-wrap").scrollLeft = 0;
 }
 
 function getOrderDisplayId(order) {
@@ -944,9 +1078,18 @@ function renderSales() {
 	pendingOrderCount.textContent = String(pendingOrders.length);
 	pendingOrderCount.hidden = pendingOrders.length === 0;
 
-	const visibleOrders = orders.filter((order) =>
-		salesStatusFilter.value === "all" || order.status === salesStatusFilter.value
-	);
+	const searchTerm = salesSearchInput.value.trim().toLocaleLowerCase("es");
+	const visibleOrders = orders.filter((order) => {
+		const matchesStatus = salesStatusFilter.value === "all" || order.status === salesStatusFilter.value;
+		const searchableText = [
+			getOrderDisplayId(order),
+			order.id,
+			order.paymentMethod,
+			order.delivery?.location || "",
+			...order.items.map((item) => item.name)
+		].join(" ").toLocaleLowerCase("es");
+		return matchesStatus && (!searchTerm || searchableText.includes(searchTerm));
+	});
 	salesOrdersList.replaceChildren();
 	for (const order of visibleOrders) {
 		const card = document.createElement("article");
@@ -1033,6 +1176,9 @@ function renderSales() {
 	salesEmptyState.hidden = orders.length > 0;
 	salesOrdersList.hidden = visibleOrders.length === 0;
 	salesFilterEmpty.hidden = orders.length === 0 || visibleOrders.length > 0;
+	salesFilterEmpty.textContent = searchTerm
+		? "No encontramos pedidos que coincidan con esa búsqueda."
+		: "No hay pedidos con este estado.";
 }
 
 function createOrderAction(orderId, action, label, className) {
@@ -1132,7 +1278,13 @@ async function updateProductStock(productId, requestedStock) {
 	}
 	const previousCart = cart.slice();
 	try {
-		await saveProduct({ ...product, stock });
+		const { error } = await supabaseClient
+			.from("products")
+			.update({ stock })
+			.eq("id", productId);
+		if (error) {
+			throw error;
+		}
 		product.stock = stock;
 		if (getCartQuantity(productId) > stock) {
 			cart = cart.filter((item) => item.productId !== productId);
@@ -1169,8 +1321,12 @@ async function confirmProductDeletion() {
 	if (editingProductId === product.id) {
 		cancelProductEdit();
 	}
-	const { error } = await supabaseClient.from("products").delete().eq("id", product.id);
-	if (error) {
+	try {
+		const { error } = await supabaseClient.from("products").delete().eq("id", product.id);
+		if (error) {
+			throw error;
+		}
+	} catch (error) {
 		showFeedback(`No se pudo eliminar el producto: ${getBackendError(error)}`, true);
 		await refreshStoreData();
 		return;
@@ -1980,6 +2136,14 @@ function useLocationInPicker() {
 }
 
 function showPaymentDetails(paymentMethod) {
+	if (paymentMethod === "Pago móvil" && !isMobilePaymentConfigured()) {
+		checkoutFeedback.textContent = "El comercio todavía no ha configurado los datos de pago móvil.";
+		return;
+	}
+	if (paymentMethod === "Transferencia" && !isTransferPaymentConfigured()) {
+		checkoutFeedback.textContent = "El comercio todavía no ha configurado los datos para transferencias.";
+		return;
+	}
 	const total = getOrderTotal();
 	const deliveryCharge = deliveryToggle.checked
 		? [{ label: "Costo de delivery", value: `${formatMoney(deliveryFee)} · ${formatBolivars(deliveryFee)}` }]
@@ -1993,16 +2157,16 @@ function showPaymentDetails(paymentMethod) {
 				{ label: "Total en dólares", value: formatMoney(total) },
 				{ label: "Total en bolívares", value: formatBolivars(total) }
 			],
-			note: "Prepara el monto exacto al momento de la entrega."
+			note: paymentSettings.cash_instructions
 		},
 		"Pago móvil": {
 			icon: "↗",
 			description: "Copia los datos para realizar el pago móvil.",
 			fields: [
 				...deliveryCharge,
-				{ label: "Teléfono", value: "0424-633-23-24" },
-				{ label: "Cédula", value: "233213345" },
-				{ label: "Banco", value: "Provincial" },
+				{ label: "Teléfono", value: paymentSettings.mobile_phone },
+				{ label: "Cédula/RIF", value: paymentSettings.mobile_document },
+				{ label: "Banco", value: paymentSettings.mobile_bank },
 				{ label: "Monto en bolívares", value: formatBolivars(total) }
 			],
 			note: "Verifica el monto y los datos antes de confirmar el pago."
@@ -2012,10 +2176,13 @@ function showPaymentDetails(paymentMethod) {
 			description: "Datos disponibles para transferencia bancaria.",
 			fields: [
 				...deliveryCharge,
-				{ label: "Banco", value: "Provincial" },
+				{ label: "Banco", value: paymentSettings.transfer_bank },
+				{ label: "Número de cuenta", value: paymentSettings.transfer_account_number },
+				{ label: "Titular", value: paymentSettings.transfer_account_holder },
+				...(paymentSettings.transfer_document ? [{ label: "Cédula/RIF", value: paymentSettings.transfer_document }] : []),
 				{ label: "Monto en bolívares", value: formatBolivars(total) }
 			],
-			note: "Falta indicar el número de cuenta y el titular. Solicita esos datos al comercio antes de transferir."
+			note: "Verifica el número de cuenta y el monto antes de confirmar el pago."
 		}
 	};
 	const details = methods[paymentMethod];
@@ -2235,6 +2402,9 @@ productForm.addEventListener("submit", async (event) => {
 		});
 	}
 	const savedProduct = editedProduct || products[products.length - 1];
+	const submitButton = document.querySelector("#submit-product-button");
+	submitButton.disabled = true;
+	submitButton.textContent = editedProduct ? "Guardando cambios..." : "Guardando producto...";
 	try {
 		await saveProduct(savedProduct);
 	} catch (error) {
@@ -2242,6 +2412,8 @@ productForm.addEventListener("submit", async (event) => {
 		showFeedback(`No se pudo guardar el producto: ${getBackendError(error)}`, true);
 		await refreshStoreData();
 		return;
+	} finally {
+		submitButton.disabled = false;
 	}
 	lastSuggestedProductCategory = null;
 	productForm.reset();
@@ -2271,6 +2443,7 @@ productForm.addEventListener("submit", async (event) => {
 });
 
 document.querySelector("#cancel-edit-button").addEventListener("click", cancelProductEdit);
+paymentSettingsForm.addEventListener("submit", savePaymentSettings);
 productNameInput.addEventListener("input", updateProductCategorySuggestion);
 productCategoryInput.addEventListener("change", () => {
 	const nextMode = ["Carnes", "Charcutería"].includes(productCategoryInput.value) ? "weight" : "unit";
@@ -2342,6 +2515,7 @@ purchaseReviewDialog.addEventListener("close", () => {
 	activeReviewOrderId = null;
 });
 salesStatusFilter.addEventListener("change", renderSales);
+salesSearchInput.addEventListener("input", renderSales);
 salesOrdersList.addEventListener("click", (event) => {
 	const button = event.target.closest("[data-order-action]");
 	if (!button) {
@@ -2353,7 +2527,18 @@ salesOrdersList.addEventListener("click", (event) => {
 		complete: "completed"
 	}[button.dataset.orderAction];
 	if (nextStatus) {
-		updateOrderStatus(button.dataset.orderId, nextStatus);
+		button.disabled = true;
+		button.textContent = "Actualizando...";
+		updateOrderStatus(button.dataset.orderId, nextStatus).finally(() => {
+			if (button.isConnected) {
+				button.disabled = false;
+				button.textContent = button.dataset.orderAction === "accept"
+					? "Aceptar pedido"
+					: button.dataset.orderAction === "reject"
+						? "Rechazar"
+						: "Marcar como completado";
+			}
+		});
 	}
 });
 purchaseReviewsList.addEventListener("change", (event) => {
@@ -2669,5 +2854,6 @@ renderProducts();
 renderCart();
 renderSales();
 renderShoppingReviewSummary();
+updatePaymentMethodAvailability();
 loadDailyRate();
 initializeBackend();

@@ -47,6 +47,24 @@ as $$
 	);
 $$;
 
+create table if not exists public.store_payment_settings (
+	id boolean primary key default true check (id),
+	cash_instructions text not null default 'Paga al retirar en tienda o al recibir tu pedido.'
+		check (char_length(cash_instructions) <= 300),
+	mobile_phone text not null default '' check (char_length(mobile_phone) <= 32),
+	mobile_document text not null default '' check (char_length(mobile_document) <= 32),
+	mobile_bank text not null default '' check (char_length(mobile_bank) <= 80),
+	transfer_bank text not null default '' check (char_length(transfer_bank) <= 80),
+	transfer_account_number text not null default '' check (char_length(transfer_account_number) <= 40),
+	transfer_account_holder text not null default '' check (char_length(transfer_account_holder) <= 100),
+	transfer_document text not null default '' check (char_length(transfer_document) <= 32),
+	updated_at timestamptz not null default now()
+);
+
+insert into public.store_payment_settings (id)
+values (true)
+on conflict (id) do nothing;
+
 create or replace function public.get_store_review_summary()
 returns table (average_rating numeric, review_count bigint)
 language sql
@@ -73,6 +91,7 @@ declare
 	v_user_id uuid := auth.uid();
 	v_item jsonb;
 	v_product public.products%rowtype;
+	v_payment_settings public.store_payment_settings%rowtype;
 	v_items jsonb := '[]'::jsonb;
 	v_quantity integer;
 	v_unit_price numeric(12, 2);
@@ -90,6 +109,21 @@ begin
 	end if;
 	if p_payment_method not in ('Efectivo', 'Pago móvil', 'Transferencia') then
 		raise exception 'El método de pago no es válido.';
+	end if;
+	select * into v_payment_settings
+	from public.store_payment_settings
+	where id = true;
+	if p_payment_method = 'Pago móvil'
+		and (coalesce(trim(v_payment_settings.mobile_phone), '') = ''
+			or coalesce(trim(v_payment_settings.mobile_document), '') = ''
+			or coalesce(trim(v_payment_settings.mobile_bank), '') = '') then
+		raise exception 'El pago móvil no está disponible porque el comercio no configuró sus datos.';
+	end if;
+	if p_payment_method = 'Transferencia'
+		and (coalesce(trim(v_payment_settings.transfer_bank), '') = ''
+			or coalesce(trim(v_payment_settings.transfer_account_number), '') = ''
+			or coalesce(trim(v_payment_settings.transfer_account_holder), '') = '') then
+		raise exception 'La transferencia no está disponible porque el comercio no configuró sus datos.';
 	end if;
 	if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
 		raise exception 'El carrito está vacío.';
@@ -275,14 +309,24 @@ $$;
 alter table public.admin_users enable row level security;
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
+alter table public.store_payment_settings enable row level security;
 
 revoke all on public.admin_users, public.products, public.orders from anon, authenticated;
+revoke all on public.store_payment_settings from anon, authenticated;
 
 drop policy if exists "Anyone can read products" on public.products;
 create policy "Anyone can read products" on public.products
 	for select to anon, authenticated using (true);
 drop policy if exists "Admins manage products" on public.products;
 create policy "Admins manage products" on public.products
+	for all to authenticated using ((select public.is_store_admin()))
+	with check ((select public.is_store_admin()));
+
+drop policy if exists "Anyone can read store payment settings" on public.store_payment_settings;
+create policy "Anyone can read store payment settings" on public.store_payment_settings
+	for select to anon, authenticated using (true);
+drop policy if exists "Admins manage store payment settings" on public.store_payment_settings;
+create policy "Admins manage store payment settings" on public.store_payment_settings
 	for all to authenticated using ((select public.is_store_admin()))
 	with check ((select public.is_store_admin()));
 
@@ -295,6 +339,8 @@ revoke all on public.admin_users from anon, authenticated;
 grant select on public.products to anon, authenticated;
 grant insert, update, delete on public.products to authenticated;
 grant select on public.orders to authenticated;
+grant select on public.store_payment_settings to anon, authenticated;
+grant insert, update, delete on public.store_payment_settings to authenticated;
 revoke all on function public.is_store_admin() from public;
 revoke all on function public.get_store_review_summary() from public;
 revoke all on function public.place_store_order(jsonb, text, jsonb) from public;

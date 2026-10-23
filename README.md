@@ -2,7 +2,7 @@
 
 ## Publicar en GitHub Pages
 
-En el repositorio, abre **Settings → Pages** y selecciona **GitHub Actions** como fuente de despliegue. Después, el workflow publica la página al hacer push a `main`. La dirección del proyecto será `https://gxbo-cell.github.io/proyecto-mio/`.
+En el repositorio, abre **Settings → Pages** y selecciona **GitHub Actions** como fuente de despliegue. El sitio no se publica con cada cambio: desde **Actions → Deploy La Tiendita to GitHub Pages → Run workflow**, selecciona `yes` en `confirm_deploy` únicamente cuando esté listo para ser público. La dirección del proyecto será `https://gxbo-cell.github.io/proyecto-mio/`.
 
 ## Activar Google Maps y sus comercios
 
@@ -33,5 +33,11 @@ La tienda usa Supabase para compartir el catálogo, las compras y las reseñas. 
 
    Cierra sesión e inicia sesión nuevamente para que aparezcan **Ventas** e **Inventario**. Los clientes pueden crear cuentas, comprar y consultar únicamente sus pedidos. El administrador puede gestionar productos y pedidos.
 7. Agrega los productos desde **Inventario**. La base comienza sin catálogo.
+
+### Datos de pago
+
+El administrador configura el pago móvil, la transferencia y las instrucciones de efectivo desde **Inventario → Datos de pago**. La información de móvil/transferencia solo se ofrece al comprador cuando los campos requeridos están completos. Los datos guardados se pueden leer públicamente para mostrarlos en el checkout; no incluyas claves bancarias, contraseñas ni credenciales. Si agregas la tabla `store_payment_settings` a un proyecto existente, vuelve a ejecutar el SQL actualizado completo; el esquema es idempotente y no borra el catálogo ni los pedidos.
+
+La tienda puede mantenerse sin publicar mientras se desarrolla. Para volver a publicarla, se debe habilitar el workflow en GitHub si fue deshabilitado y ejecutarlo manualmente confirmando `yes`. El watcher de auto-push de VS Code ya no se inicia al abrir la carpeta; los cambios locales no se suben automáticamente.
 
 La clave `anon/public` se entrega al navegador y no es una contraseña; las políticas RLS y las funciones SQL aplican los permisos. **Nunca** configures `service_role` en GitHub Pages ni en el JavaScript del navegador. Las compras antiguas que solo existían en el `localStorage` de un navegador no se importan automáticamente ni se atribuyen a cuentas: agrega de nuevo los productos al inventario compartido.
