@@ -1,4 +1,4 @@
-create extension if not exists pgcrypto;
+﻿create extension if not exists pgcrypto;
 
 create table if not exists public.admin_users (
 	user_id uuid primary key references auth.users (id) on delete cascade,
@@ -8,12 +8,18 @@ create table if not exists public.admin_users (
 create table if not exists public.products (
 	id uuid primary key default gen_random_uuid(),
 	name text not null check (char_length(trim(name)) between 1 and 60),
+	brand text not null default '' check (char_length(brand) <= 80),
+	image_url text not null default '' check (char_length(image_url) <= 2048),
 	price numeric(12, 2) not null check (price > 0),
 	category text not null check (category in ('Carnes', 'Charcutería', 'Víveres', 'Bebidas', 'Lácteos', 'Otros')),
 	sale_mode text not null check (sale_mode in ('unit', 'weight')),
 	stock integer not null check (stock >= 0),
 	created_at timestamptz not null default now()
 );
+
+alter table public.products
+	add column if not exists brand text not null default '' check (char_length(brand) <= 80),
+	add column if not exists image_url text not null default '' check (char_length(image_url) <= 2048);
 
 create table if not exists public.orders (
 	id uuid primary key default gen_random_uuid(),
@@ -33,6 +39,7 @@ create table if not exists public.orders (
 
 create index if not exists orders_user_created_idx on public.orders (user_id, created_at desc);
 create index if not exists orders_review_rating_idx on public.orders (review_rating) where review_rating is not null;
+create index if not exists orders_status_created_idx on public.orders (status, created_at desc);
 
 create or replace function public.is_store_admin()
 returns boolean
@@ -334,6 +341,8 @@ drop policy if exists "Customers and admins read orders" on public.orders;
 create policy "Customers and admins read orders" on public.orders
 	for select to authenticated
 	using (user_id = (select auth.uid()) or (select public.is_store_admin()));
+-- La actualización de órdenes se realiza exclusivamente vía la función RPC admin_update_store_order_status (security definer).
+-- No se crea política UPDATE directa para evitar acceso directo a la tabla desde el cliente.
 drop policy if exists "Admins update orders" on public.orders;
 revoke all on public.admin_users from anon, authenticated;
 grant select on public.products to anon, authenticated;

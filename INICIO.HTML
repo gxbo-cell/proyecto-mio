@@ -1,20 +1,27 @@
-    <!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="theme-color" content="#f4f2ec">
+	<meta name="description" content="La Tiendita: catálogo en línea de carnes, charcutería, víveres y bebidas con entrega a domicilio y tasa oficial BCV.">
+	<meta property="og:title" content="La Tiendita | Catálogo y administración">
+	<meta property="og:description" content="Compra fácil, fresco y cerca. Explora el catálogo, arma tu pedido y gestiona ventas e inventario.">
+	<meta property="og:type" content="website">
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
 	<title>La Tiendita | Catálogo y administración</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
-	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-	<link rel="stylesheet" href="ESTILO.CSS">
-	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+	<link rel="stylesheet" href="ESTILO.CSS?v=5.8">
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 	<script src="MAPS_CONFIG.JS" defer></script>
+	<script src="MAPS_CONFIG.LOCAL.JS" defer></script>
 	<script src="SUPABASE_CONFIG.JS" defer></script>
-	<script src="FUNCIONAMIENTO.JS" defer></script>
+	<script src="SUPABASE_CONFIG.LOCAL.JS" defer></script>
+	<script src="FUNCIONAMIENTO.JS?v=5.8" defer></script>
 </head>
 <body>
 	<header class="topbar">
@@ -23,9 +30,9 @@
 			<span>la tiendita<span class="brand-period">.</span></span>
 		</a>
 		<nav class="view-switch" aria-label="Secciones de la tienda">
-			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true">Compras</button>
-			<button class="view-switch-button" type="button" data-view-target="sales-view" aria-pressed="false" hidden>Ventas <span id="pending-order-count" class="nav-badge" hidden>0</span></button>
-			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false" hidden>Inventario</button>
+			<button class="view-switch-button active" type="button" data-view-target="shopping-view" aria-pressed="true"><span class="nav-icon" data-icon="bag" aria-hidden="true"></span><span>Compras</span></button>
+			<button class="view-switch-button" type="button" data-view-target="sales-view" aria-pressed="false" hidden><span class="nav-icon" data-icon="chart" aria-hidden="true"></span><span>Ventas</span><span id="pending-order-count" class="nav-badge" hidden>0</span></button>
+			<button class="view-switch-button" type="button" data-view-target="admin-view" aria-pressed="false" hidden><span class="nav-icon" data-icon="box" aria-hidden="true"></span><span>Inventario</span></button>
 		</nav>
 		<div class="account-actions">
 			<button id="my-orders-button" class="account-button" type="button" hidden>Mis pedidos</button>
@@ -53,9 +60,9 @@
 			<section class="shopping-rate" aria-label="Tasa oficial del dólar">
 				<div>
 					<span class="shopping-rate-label">Tasa oficial BCV · Bs/USD</span>
-					<strong id="shopping-rate-value" class="shopping-rate-value">Consultando...</strong>
+					<strong id="shopping-rate-value" class="shopping-rate-value">Consultando…</strong>
 				</div>
-				<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="shopping-rate-updated">Buscando tasa del día</span></a>
+				<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="shopping-rate-updated">Tasa oficial BCV</span></a>
 			</section>
 
 			<div class="workspace shopping-workspace">
@@ -66,28 +73,45 @@
 						<h2 id="inventory-title">Catálogo de productos</h2>
 					</div>
 					<label class="search-box" for="search-input">
-						<span class="search-icon" aria-hidden="true">⌕</span>
+						<span class="search-icon" data-icon="search" aria-hidden="true"></span>
 						<input id="search-input" type="search" placeholder="Buscar por nombre" autocomplete="off">
 					</label>
 				</div>
-				<div id="category-filters" class="category-filters" role="group" aria-label="Filtrar productos por categoría">
-					<button class="category-filter active" type="button" data-category="Todos" aria-pressed="true">Todos</button>
-					<button class="category-filter" type="button" data-category="Carnes" aria-pressed="false">Carnes</button>
-					<button class="category-filter" type="button" data-category="Charcutería" aria-pressed="false">Charcutería</button>
-					<button class="category-filter" type="button" data-category="Víveres" aria-pressed="false">Víveres</button>
-					<button class="category-filter" type="button" data-category="Bebidas" aria-pressed="false">Bebidas</button>
-					<button class="category-filter" type="button" data-category="Lácteos" aria-pressed="false">Lácteos</button>
-					<button class="category-filter" type="button" data-category="Otros" aria-pressed="false">Otros</button>
+				<div id="category-filters" class="category-filters" role="group" aria-label="Filtrar productos por categoría" hidden>
+					<button class="category-filter active" type="button" data-category="Todos" aria-pressed="true">Todos <span class="category-count" data-category-count="Todos">0</span></button>
+					<button class="category-filter" type="button" data-category="Carnes" aria-pressed="false">Carnes <span class="category-count" data-category-count="Carnes">0</span></button>
+					<button class="category-filter" type="button" data-category="Charcutería" aria-pressed="false">Charcutería <span class="category-count" data-category-count="Charcutería">0</span></button>
+					<button class="category-filter" type="button" data-category="Víveres" aria-pressed="false">Víveres <span class="category-count" data-category-count="Víveres">0</span></button>
+					<button class="category-filter" type="button" data-category="Bebidas" aria-pressed="false">Bebidas <span class="category-count" data-category-count="Bebidas">0</span></button>
+					<button class="category-filter" type="button" data-category="Lácteos" aria-pressed="false">Lácteos <span class="category-count" data-category-count="Lácteos">0</span></button>
+					<button class="category-filter" type="button" data-category="Otros" aria-pressed="false">Otros <span class="category-count" data-category-count="Otros">0</span></button>
+				</div>
+				<div id="catalog-toolbar" class="catalog-toolbar" hidden>
+					<button id="availability-filter" class="availability-filter" type="button" aria-pressed="false">Solo disponibles</button>
+					<label class="catalog-sort-label" for="catalog-sort">Ordenar
+						<select id="catalog-sort" class="catalog-sort">
+							<option value="recommended">Recomendados</option>
+							<option value="price-low">Precio: menor a mayor</option>
+							<option value="price-high">Precio: mayor a menor</option>
+							<option value="name">Nombre: A–Z</option>
+						</select>
+					</label>
+					<p id="catalog-results-count" class="catalog-results-count" aria-live="polite"></p>
+				</div>
+				<div id="catalog-loading" class="catalog-loading" role="status">
+					<span id="catalog-loading-message">Cargando productos frescos…</span>
+					<button id="catalog-retry-button" class="catalog-retry-button" type="button" hidden>Intentar de nuevo</button>
 				</div>
 				<div id="stock-alert" class="stock-alert" role="status" aria-live="polite" hidden></div>
 				<p id="catalog-feedback" class="catalog-feedback" role="status" aria-live="polite"></p>
 				<div id="catalog-products" class="catalog-grid"></div>
-				<div id="empty-state" class="empty-state">
+				<div id="empty-state" class="empty-state" hidden>
 					<span class="empty-icon" aria-hidden="true">＋</span>
 					<strong>Aún no hay productos</strong>
 					<span>Pronto encontrarás productos en el catálogo.</span>
 				</div>
 				<p id="no-results" class="no-results" hidden>No encontramos productos con esos filtros.</p>
+				<button id="clear-catalog-filters" class="clear-catalog-filters" type="button" hidden>Limpiar filtros</button>
 			</section>
 
 			<aside class="side-column">
@@ -101,7 +125,7 @@
 					<p id="cart-empty" class="cart-empty">Aún no has añadido productos.</p>
 					<ul id="cart-items" class="cart-items" aria-label="Productos en el carrito"></ul>
 					<p id="cart-delivery-line" class="cart-delivery-line" hidden></p>
-					<div class="cart-total-row"><span>Total</span><span class="cart-total-values"><strong id="cart-total">$0.00</strong><small id="cart-total-bs">Tasa en consulta</small></span></div>
+					<div class="cart-total-row"><span>Total</span><span class="cart-total-values"><strong id="cart-total">$0.00</strong><small id="cart-total-bs">Bs 0,00</small></span></div>
 					<button id="checkout-button" class="primary-button checkout-button" type="button" disabled>Cerrar compra</button>
 				</section>
 
@@ -113,22 +137,22 @@
 						<span>Solicitar delivery</span>
 					</label>
 					<div id="delivery-fields" hidden>
-						<label class="field-label" for="delivery-address">Ubicación de entrega</label>
-						<textarea id="delivery-address" rows="3" maxlength="240" placeholder="Dirección, zona y punto de referencia"></textarea>
+						<label class="field-label" for="delivery-address">Dirección y punto de referencia</label>
+						<textarea id="delivery-address" rows="3" maxlength="240" aria-describedby="map-feedback delivery-feedback" placeholder="Calle, edificio, zona y punto de referencia"></textarea>
 						<div class="delivery-location-actions">
-							<button id="use-current-location" class="location-button" type="button"><span aria-hidden="true">⌖</span> Usar mi ubicación</button>
-							<button id="open-google-maps" class="map-button" type="button"><span aria-hidden="true">⌖</span> Elegir en el mapa</button>
+							<button id="use-current-location" class="location-button" type="button"><span class="button-icon" data-icon="pin" aria-hidden="true"></span> Usar mi ubicación</button>
+							<button id="open-google-maps" class="map-button" type="button"><span class="button-icon" data-icon="map" aria-hidden="true"></span> Elegir en el mapa</button>
 						</div>
-						<label class="field-label map-link-label" for="delivery-map-link">Enlace compartido de Google Maps</label>
-						<input id="delivery-map-link" class="map-link-input" type="url" placeholder="Pega aquí el enlace de la ubicación">
+						<label class="field-label map-link-label" for="delivery-map-link">Enlace de Google Maps (opcional)</label>
+						<input id="delivery-map-link" class="map-link-input" type="url" aria-describedby="map-feedback" placeholder="Pega aquí el enlace de la ubicación">
 						<a id="delivery-map-link-preview" class="delivery-map-link" target="_blank" rel="noreferrer" hidden>Abrir ubicación en Google Maps ↗</a>
 						<p id="map-feedback" class="map-feedback" role="status" aria-live="polite">Escribe una dirección, usa GPS o pega un enlace de Google Maps.</p>
-						<div id="delivery-estimate" class="delivery-estimate" hidden>
+						<div id="delivery-estimate" class="delivery-estimate" role="status" aria-live="polite" hidden>
 							<div><span class="eyebrow">COSTO ESTIMADO</span><strong id="delivery-fee">$1.00</strong><small id="delivery-zone-description">Zona inicial · hasta 5 km</small></div>
 							<strong id="delivery-fee-bs" class="delivery-fee-bs"></strong>
 						</div>
-						<p class="delivery-note">El pedido se guarda solo en este dispositivo; la aplicación no lo envía a conductores. Coordina la entrega directamente con la tienda.</p>
-						<p class="delivery-note">Tarifa estimada: $1 por cada 5 km desde Caracas centro.</p>
+						<p class="delivery-note">El pedido se guarda en la tienda compartida; la aplicación no lo envía a conductores. Coordina la entrega directamente con la tienda.</p>
+						<p class="delivery-note">Estimado en línea recta desde Caracas centro: mínimo $1 y $1 por cada tramo adicional de hasta 5 km. Confirma el costo final con la tienda.</p>
 					</div>
 					<p id="delivery-feedback" class="form-feedback error" role="status" aria-live="polite"></p>
 				</section>
@@ -153,18 +177,18 @@
 				</div>
 				<p class="intro-copy">Revisa cada pedido, acepta las compras y mantén tus ventas organizadas.</p>
 			</section>
-			<p class="sales-local-note"><span aria-hidden="true">ⓘ</span> Los pedidos se guardan en la tienda compartida y son visibles para el equipo administrador.</p>
+			<p class="sales-local-note"><span class="button-icon" data-icon="info" aria-hidden="true"></span> Los pedidos se guardan en la tienda compartida y son visibles para el equipo administrador.</p>
 			<section class="sales-stats" aria-label="Resumen de pedidos y ventas">
-				<article class="sales-stat sales-stat-pending"><span class="sales-stat-icon" aria-hidden="true">◷</span><span class="sales-stat-label">Por aceptar</span><strong id="sales-pending-count" class="sales-stat-value">0</strong></article>
-				<article class="sales-stat"><span class="sales-stat-icon" aria-hidden="true">✓</span><span class="sales-stat-label">En preparación</span><strong id="sales-accepted-count" class="sales-stat-value">0</strong></article>
-				<article class="sales-stat"><span class="sales-stat-icon" aria-hidden="true">$</span><span class="sales-stat-label">Ventas completadas</span><strong id="sales-completed-count" class="sales-stat-value">0</strong></article>
-				<article class="sales-stat sales-stat-revenue"><span class="sales-stat-icon" aria-hidden="true">↗</span><span class="sales-stat-label">Ingresos confirmados</span><strong id="sales-revenue" class="sales-stat-value">$0.00</strong></article>
+				<article class="sales-stat sales-stat-pending"><span class="sales-stat-icon" data-icon="clock" aria-hidden="true"></span><span class="sales-stat-label">Por aceptar</span><strong id="sales-pending-count" class="sales-stat-value">0</strong></article>
+				<article class="sales-stat"><span class="sales-stat-icon" data-icon="check" aria-hidden="true"></span><span class="sales-stat-label">En preparación</span><strong id="sales-accepted-count" class="sales-stat-value">0</strong></article>
+				<article class="sales-stat"><span class="sales-stat-icon" data-icon="receipt" aria-hidden="true"></span><span class="sales-stat-label">Ventas completadas</span><strong id="sales-completed-count" class="sales-stat-value">0</strong></article>
+				<article class="sales-stat sales-stat-revenue"><span class="sales-stat-icon" data-icon="trend" aria-hidden="true"></span><span class="sales-stat-label">Ingresos confirmados</span><strong id="sales-revenue" class="sales-stat-value">$0.00</strong></article>
 			</section>
 			<section class="sales-orders-panel" aria-labelledby="sales-orders-title">
 				<div class="sales-orders-heading">
 					<div><p class="eyebrow">CENTRO DE PEDIDOS</p><h2 id="sales-orders-title">Todas las órdenes</h2></div>
 					<div class="sales-order-tools">
-						<label class="search-box sales-search-box" for="sales-search-input"><span class="search-icon" aria-hidden="true">⌕</span><input id="sales-search-input" type="search" placeholder="Buscar pedido o producto" autocomplete="off"></label>
+						<label class="search-box sales-search-box" for="sales-search-input"><span class="search-icon" data-icon="search" aria-hidden="true"></span><input id="sales-search-input" type="search" placeholder="Buscar pedido o producto" autocomplete="off"></label>
 						<label class="sales-filter-wrap" for="sales-status-filter"><span>Estado</span>
 							<select id="sales-status-filter" class="sales-status-filter">
 								<option value="all">Todos</option>
@@ -203,8 +227,8 @@
 				<article class="stat stat-alert"><span class="stat-label">Productos agotados</span><strong id="out-of-stock-count" class="stat-value">0</strong></article>
 				<article class="stat stat-rate">
 					<span class="stat-label">Tasa oficial BCV · Bs/USD</span>
-					<strong id="daily-rate-value" class="stat-value">Consultando...</strong>
-					<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="rate-updated">Buscando tasa del día</span></a>
+					<strong id="daily-rate-value" class="stat-value">Consultando…</strong>
+					<a class="rate-source" href="https://www.bcv.org.ve/estadisticas/tipo-de-cambio-de-referencia-smc" target="_blank" rel="noreferrer">BCV <span id="rate-updated">Tasa oficial BCV</span></a>
 				</article>
 			</section>
 
@@ -212,7 +236,7 @@
 				<section class="inventory-panel admin-inventory-panel" aria-labelledby="admin-inventory-title">
 					<div class="section-heading">
 						<div><p class="eyebrow">CONTROL DE EXISTENCIAS</p><h2 id="admin-inventory-title">Inventario de productos</h2></div>
-						<label class="search-box" for="inventory-search-input"><span class="search-icon" aria-hidden="true">⌕</span><input id="inventory-search-input" type="search" placeholder="Buscar producto" autocomplete="off"></label>
+						<label class="search-box" for="inventory-search-input"><span class="search-icon" data-icon="search" aria-hidden="true"></span><input id="inventory-search-input" type="search" placeholder="Buscar producto" autocomplete="off"></label>
 					</div>
 					<div class="admin-filter-row">
 						<label class="admin-filter-label" for="stock-filter">Mostrar</label>
@@ -239,7 +263,19 @@
 						<form id="product-form">
 							<label class="field-label" for="product-name">Nombre del producto</label>
 							<input id="product-name" name="name" type="text" maxlength="60" placeholder="Ej. Café molido" required>
+							<label class="field-label" for="product-brand">Marca <span class="optional-field">(opcional)</span></label>
+							<input id="product-brand" name="brand" type="text" maxlength="80" placeholder="Ej. Café Venezuela">
 							<p id="product-category-hint" class="category-hint" role="status" aria-live="polite"></p>
+							<label class="field-label" for="product-image-url">Foto del producto</label>
+							<div class="product-image-search-row">
+								<input id="product-image-url" name="imageUrl" type="url" maxlength="2048" placeholder="Pega aquí el enlace directo de la imagen" autocomplete="url">
+								<button id="search-product-image" class="secondary-button" type="button">Buscar imagen</button>
+							</div>
+							<p class="image-help">Busca una foto del producto y pega el enlace directo de la imagen para ver la vista previa.</p>
+							<div id="product-image-preview" class="product-image-preview" hidden>
+								<img id="product-image-preview-img" alt="">
+								<span id="product-image-preview-message">Vista previa del producto</span>
+							</div>
 							<label class="field-label" for="product-category">Categoría</label>
 							<select id="product-category" name="category" required>
 								<option value="Carnes">Carnes</option><option value="Charcutería">Charcutería</option><option value="Víveres" selected>Víveres</option><option value="Bebidas">Bebidas</option><option value="Lácteos">Lácteos</option><option value="Otros">Otros</option>
@@ -347,7 +383,7 @@
 					<label class="payment-option" id="transfer-payment-option"><input type="radio" name="payment-method" value="Transferencia" required><span class="payment-symbol" aria-hidden="true">⇄</span><span class="payment-option-copy"><strong>Transferencia</strong><small id="transfer-payment-availability">Disponible cuando el comercio complete sus datos.</small></span></label>
 				</fieldset>
 				<div id="checkout-delivery" class="checkout-delivery" hidden></div>
-				<div class="dialog-total"><span>Total a pagar</span><span class="cart-total-values"><strong id="checkout-total">$0.00</strong><small id="checkout-total-bs">Tasa en consulta</small></span></div>
+				<div class="dialog-total"><span>Total a pagar</span><span class="cart-total-values"><strong id="checkout-total">$0.00</strong><small id="checkout-total-bs">Bs 0,00</small></span></div>
 				<p id="checkout-feedback" class="checkout-feedback" role="status" aria-live="polite"></p>
 				<div class="dialog-actions">
 					<button id="cancel-checkout" class="secondary-button" type="button">Seguir comprando</button>
@@ -382,7 +418,7 @@
 
 		<dialog id="map-picker-dialog" class="map-picker-dialog" aria-labelledby="map-picker-title">
 			<div class="map-picker-header">
-				<div class="map-picker-mark" aria-hidden="true">⌖</div>
+				<div class="map-picker-mark" data-icon="pin" aria-hidden="true"></div>
 				<div class="map-picker-heading">
 					<p class="eyebrow">UBICACIÓN DE ENTREGA</p>
 					<h2 id="map-picker-title">¿Dónde te lo llevamos?</h2>
@@ -393,23 +429,39 @@
 			<div class="map-picker-tools">
 				<div class="map-picker-search-wrap">
 					<label class="map-picker-search" for="map-picker-input">
-						<span aria-hidden="true">⌕</span>
+						<span class="map-search-icon" data-icon="search" aria-hidden="true"></span>
 						<input id="map-picker-input" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="map-picker-suggestions" aria-label="Dirección, zona o lugar" placeholder="Dirección, zona o lugar" autocomplete="off">
 					</label>
 					<ul id="map-picker-suggestions" class="map-picker-suggestions" role="listbox" aria-label="Sugerencias de lugares" hidden></ul>
 				</div>
 				<button id="search-map-location" class="map-search-button" type="button">Buscar</button>
-				<button id="map-picker-current-location" class="location-button" type="button"><span aria-hidden="true">⌖</span> Mi ubicación</button>
+				<button id="map-picker-current-location" class="location-button" type="button"><span class="button-icon" data-icon="pin" aria-hidden="true"></span> Mi ubicación</button>
 			</div>
 			<div class="map-picker-view">
 				<div class="map-picker-frame-wrap">
 					<div id="map-picker-map" class="map-picker-map" role="application" aria-label="Mapa interactivo. Toca el lugar donde deseas recibir el pedido."></div>
+					<div id="map-picker-map-status" class="map-picker-map-status" role="status" aria-live="polite" hidden>
+						<span id="map-picker-map-status-message"></span>
+						<button id="retry-map-load" class="secondary-button" type="button" hidden>Reintentar mapa</button>
+					</div>
 				</div>
 				<aside class="map-picker-selection">
 					<p class="eyebrow">PUNTO SELECCIONADO</p>
 					<strong id="map-picker-selection-summary">Busca una dirección para empezar</strong>
 					<small id="map-picker-coordinates" class="map-picker-coordinates"></small>
-					<p id="map-business-feedback" class="map-business-feedback" role="status" aria-live="polite">Los comercios cercanos aparecerán en el mapa.</p>
+					<div class="nearby-places-heading">
+						<p class="eyebrow">REFERENCIAS CERCANAS</p>
+						<button id="refresh-nearby-places" class="nearby-refresh-button" type="button">Actualizar</button>
+					</div>
+					<p id="map-business-feedback" class="map-business-feedback" role="status" aria-live="polite">Buscando abastos y comercios cercanos…</p>
+					<div class="nearby-map-legend" aria-label="Leyenda de referencias">
+						<span><b class="legend-abasto">A</b> Abasto</span>
+						<span><b class="legend-supermarket">S</b> Supermercado</span>
+						<span><b class="legend-pharmacy">F</b> Farmacia</span>
+						<span><b class="legend-mall">C</b> Centro comercial</span>
+					</div>
+					<ul id="nearby-places-list" class="nearby-places-list" aria-label="Abastos y comercios cercanos"></ul>
+					<p class="map-data-attribution">Lugares de OpenStreetMap · pueden faltar comercios. <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Contribuir a corregir el mapa</a></p>
 					<p id="map-picker-feedback" role="status" aria-live="polite">La ubicación confirmada se guardará en los datos de delivery.</p>
 					<a id="open-map-picker-google" class="map-picker-google-link" href="https://www.google.com/maps" target="_blank" rel="noreferrer">Abrir en Google Maps ↗</a>
 				</aside>
@@ -435,6 +487,10 @@
 			</div>
 		</dialog>
 		<footer class="page-footer"><span>La Tiendita <span class="brand-period">·</span> Inventario sencillo, tienda en orden.</span><span>Los precios mayores a $50 reciben 10% de descuento.</span></footer>
+		<aside id="mobile-cart-summary" class="mobile-cart-summary" aria-label="Resumen del carrito" hidden>
+			<div class="mobile-cart-copy"><span id="mobile-cart-count">0 productos</span><strong id="mobile-cart-total">$0.00</strong></div>
+			<button id="mobile-checkout-button" class="primary-button" type="button">Continuar</button>
+		</aside>
 	</main>
 </body>
 </html>

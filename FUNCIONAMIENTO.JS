@@ -1,6 +1,7 @@
-"use strict";
+﻿"use strict";
 
-const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v1";
+const RATE_STORAGE_KEY = "la-tiendita-bcv-rate-v2";
+const CART_STORAGE_KEY = "la-tiendita-cart-v1";
 const RATE_ENDPOINT = "https://ve.dolarapi.com/v1/dolares/oficial";
 const RATE_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const DELIVERY_ORIGIN = { latitude: 10.4806, longitude: -66.9036 };
@@ -10,6 +11,9 @@ const DISCOUNT_THRESHOLD = 50;
 const DISCOUNT_RATE = 0.1;
 const GRAMS_PER_KILOGRAM = 1000;
 const GRAMS_PER_POUND = 453.59237;
+const NEARBY_PLACE_RADIUS_KM = 2.5;
+const NEARBY_PLACES_CACHE_MS = 10 * 60 * 1000;
+const NEARBY_PLACES_MIN_INTERVAL_MS = 4000;
 const WEIGHT_UNITS = {
 	g: { grams: 1, step: "1", minimum: "1" },
 	kg: { grams: GRAMS_PER_KILOGRAM, step: "0.001", minimum: "0.001" },
@@ -23,9 +27,14 @@ const bolivarFormatter = new Intl.NumberFormat("es-VE", {
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2
 });
-
 const productForm = document.querySelector("#product-form");
 const productNameInput = document.querySelector("#product-name");
+const productBrandInput = document.querySelector("#product-brand");
+const productImageUrlInput = document.querySelector("#product-image-url");
+const productImagePreview = document.querySelector("#product-image-preview");
+const productImagePreviewImage = document.querySelector("#product-image-preview-img");
+const productImagePreviewMessage = document.querySelector("#product-image-preview-message");
+const searchProductImageButton = document.querySelector("#search-product-image");
 const productCategoryInput = document.querySelector("#product-category");
 const productCategoryHint = document.querySelector("#product-category-hint");
 const productSaleModeInput = document.querySelector("#product-sale-mode");
@@ -39,9 +48,18 @@ const paymentSettingsForm = document.querySelector("#payment-settings-form");
 const paymentSettingsFeedback = document.querySelector("#payment-settings-feedback");
 const paymentSettingsSaveButton = document.querySelector("#save-payment-settings");
 const catalogProducts = document.querySelector("#catalog-products");
+const catalogLoading = document.querySelector("#catalog-loading");
+const catalogLoadingMessage = document.querySelector("#catalog-loading-message");
+const catalogRetryButton = document.querySelector("#catalog-retry-button");
+const categoryFilters = document.querySelector("#category-filters");
+const catalogToolbar = document.querySelector("#catalog-toolbar");
 const emptyState = document.querySelector("#empty-state");
 const noResults = document.querySelector("#no-results");
 const searchInput = document.querySelector("#search-input");
+const catalogSort = document.querySelector("#catalog-sort");
+const availabilityFilter = document.querySelector("#availability-filter");
+const catalogResultsCount = document.querySelector("#catalog-results-count");
+const clearCatalogFiltersButton = document.querySelector("#clear-catalog-filters");
 const inventorySearchInput = document.querySelector("#inventory-search-input");
 const stockFilter = document.querySelector("#stock-filter");
 const formFeedback = document.querySelector("#form-feedback");
@@ -58,6 +76,9 @@ const cartItems = document.querySelector("#cart-items");
 const cartEmpty = document.querySelector("#cart-empty");
 const cartCount = document.querySelector("#cart-count");
 const cartTotal = document.querySelector("#cart-total");
+const mobileCartSummary = document.querySelector("#mobile-cart-summary");
+const mobileCartCount = document.querySelector("#mobile-cart-count");
+const mobileCartTotal = document.querySelector("#mobile-cart-total");
 const cartDeliveryLine = document.querySelector("#cart-delivery-line");
 const checkoutButton = document.querySelector("#checkout-button");
 const checkoutDialog = document.querySelector("#checkout-dialog");
@@ -85,8 +106,13 @@ const mapPickerDialog = document.querySelector("#map-picker-dialog");
 const mapPickerInput = document.querySelector("#map-picker-input");
 const mapPickerSuggestions = document.querySelector("#map-picker-suggestions");
 const mapPickerMapElement = document.querySelector("#map-picker-map");
+const mapPickerMapStatus = document.querySelector("#map-picker-map-status");
+const mapPickerMapStatusMessage = document.querySelector("#map-picker-map-status-message");
+const retryMapLoadButton = document.querySelector("#retry-map-load");
 const mapPickerFeedback = document.querySelector("#map-picker-feedback");
 const mapBusinessFeedback = document.querySelector("#map-business-feedback");
+const nearbyPlacesList = document.querySelector("#nearby-places-list");
+const refreshNearbyPlacesButton = document.querySelector("#refresh-nearby-places");
 const mapPickerCurrentLocationButton = document.querySelector("#map-picker-current-location");
 const salesOrdersList = document.querySelector("#sales-orders-list");
 const salesEmptyState = document.querySelector("#sales-empty-state");
@@ -103,6 +129,9 @@ const signOutButton = document.querySelector("#sign-out-button");
 const myOrdersButton = document.querySelector("#my-orders-button");
 
 let products = [];
+let hasLoadedProducts = false;
+let catalogLoadTimeoutId = 0;
+let catalogLoadError = false;
 let orders = [];
 let supabaseClient = null;
 let currentUser = null;
@@ -119,27 +148,35 @@ let paymentSettings = {
 	transfer_document: ""
 };
 let activeReviewOrderId = null;
-let cart = [];
+let cart = loadCachedCart();
 let exchangeRate = loadCachedRate();
 let isLoadingExchangeRate = false;
-let hasAttemptedExchangeRateLoad = false;
 let deliveryCoordinates = null;
 let mapPickerCoordinates = null;
-let mapPickerSearchTimer;
+let mapPickerSearchTimer = 0;
+let nearbyPlacesSearchTimer = 0;
 let mapSuggestionRequestId = 0;
+let mapReverseGeocodeRequestId = 0;
+let nearbyPlacesRequestId = 0;
+let nearbyPlacesLastRequestAt = 0;
 let mapSuggestionItems = [];
 let activeMapSuggestionIndex = -1;
-let mapPlacesRequestId = 0;
-let mapPlacesSearchTimer;
 let mapPickerMap;
 let mapPickerMarker;
-let mapPlacesLayer;
+let mapNearbyLayer;
+let mapNearbyMarkers = [];
 let mapPickerProvider = null;
+let leafletLibraryPromise;
+let mapboxLibraryPromise;
 let googleMapsApiPromise;
+let localMapsConfigPromise;
+let localMapboxConfigPromise;
 let googlePlacePredictions = [];
 let googleAutocompleteSessionToken = null;
+const nearbyPlacesCache = new Map();
 let deliveryFee = 0;
 let activeCategory = "Todos";
+let showAvailableOnly = false;
 let editingProductId = null;
 let pendingDeleteProductId = null;
 let isSuggestingProductCategory = false;
@@ -157,6 +194,127 @@ const productCategoryKeywords = [
 
 function normalizeProductText(value) {
 	return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+}
+
+function getSafeProductImageUrl(value) {
+	if (!value.trim()) {
+		return "";
+	}
+	try {
+		const url = new URL(value.trim());
+		return url.protocol === "https:" ? url.href : "";
+	} catch {
+		return "";
+	}
+}
+
+function updateProductImagePreview() {
+	const enteredUrl = productImageUrlInput.value.trim();
+	const imageUrl = getSafeProductImageUrl(enteredUrl);
+	updateProductImageAlt();
+	productImagePreview.hidden = !enteredUrl;
+	productImagePreviewImage.hidden = true;
+	productImagePreviewImage.removeAttribute("src");
+	if (!enteredUrl) {
+		return;
+	}
+	if (!imageUrl) {
+		productImagePreviewMessage.textContent = "Pega un enlace HTTPS válido para mostrar la foto con seguridad.";
+		return;
+	}
+	productImagePreviewMessage.textContent = "Cargando vista previa…";
+	productImagePreviewImage.onload = () => {
+		productImagePreviewImage.hidden = false;
+		productImagePreviewMessage.textContent = "Vista previa del producto";
+	};
+	productImagePreviewImage.onerror = () => {
+		productImagePreviewImage.hidden = true;
+		productImagePreviewMessage.textContent = "No se pudo mostrar esta imagen. Prueba con otro enlace directo.";
+	};
+	productImagePreviewImage.src = imageUrl;
+}
+
+function updateProductImageAlt() {
+	productImagePreviewImage.alt = [productBrandInput.value.trim(), productNameInput.value.trim()]
+		.filter(Boolean)
+		.join(" ") || "Vista previa del producto";
+}
+
+function loadCachedCart() {
+	try {
+		const cachedCart = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
+		if (!Array.isArray(cachedCart)) {
+			return [];
+		}
+		const quantities = new Map();
+		for (const item of cachedCart) {
+			if (typeof item?.productId === "string" && Number.isInteger(item.quantity) && item.quantity > 0) {
+				quantities.set(item.productId, (quantities.get(item.productId) || 0) + item.quantity);
+			}
+		}
+		return [...quantities].map(([productId, quantity]) => ({ productId, quantity }));
+	} catch {
+		return [];
+	}
+}
+
+function saveCart() {
+	try {
+		localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+	} catch {
+		catalogFeedback.textContent = "No se pudo guardar el carrito en este dispositivo.";
+		catalogFeedback.classList.add("error");
+	}
+}
+
+function reconcileCartWithProducts() {
+	const availableProducts = new Map(products.map((product) => [product.id, product]));
+	const updatedCart = cart.reduce((items, item) => {
+		const product = availableProducts.get(item.productId);
+		if (!product || product.stock < 1) {
+			return items;
+		}
+		items.push({ ...item, quantity: Math.min(item.quantity, product.stock) });
+		return items;
+	}, []);
+	const changed = updatedCart.length !== cart.length ||
+		updatedCart.some((item, index) => item.quantity !== cart[index]?.quantity);
+	cart = updatedCart;
+	if (changed) {
+		saveCart();
+	}
+}
+
+function loadLocalGoogleMapsConfig() {
+	if (window.GOOGLE_MAPS_API_KEY || !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+		return Promise.resolve(Boolean(window.GOOGLE_MAPS_API_KEY));
+	}
+	if (!localMapsConfigPromise) {
+		localMapsConfigPromise = new Promise((resolve) => {
+			const script = document.createElement("script");
+			script.src = "MAPS_CONFIG.LOCAL.JS";
+			script.addEventListener("load", () => resolve(Boolean(window.GOOGLE_MAPS_API_KEY)), { once: true });
+			script.addEventListener("error", () => resolve(false), { once: true });
+			document.head.append(script);
+		});
+	}
+	return localMapsConfigPromise;
+}
+
+function loadLocalMapboxConfig() {
+	if (window.MAPBOX_PUBLIC_TOKEN || !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+		return Promise.resolve(Boolean(window.MAPBOX_PUBLIC_TOKEN));
+	}
+	if (!localMapboxConfigPromise) {
+		localMapboxConfigPromise = new Promise((resolve) => {
+			const script = document.createElement("script");
+			script.src = "MAPBOX_CONFIG.LOCAL.JS";
+			script.addEventListener("load", () => resolve(Boolean(window.MAPBOX_PUBLIC_TOKEN)), { once: true });
+			script.addEventListener("error", () => resolve(false), { once: true });
+			document.head.append(script);
+		});
+	}
+	return localMapboxConfigPromise;
 }
 
 function suggestProductCategory(name) {
@@ -201,6 +359,8 @@ function mapProduct(row) {
 	return {
 		id: row.id,
 		name: row.name,
+		brand: row.brand || "",
+		imageUrl: row.image_url || "",
 		price: Number(row.price),
 		category: row.category,
 		saleMode: row.sale_mode,
@@ -240,6 +400,8 @@ async function loadProducts() {
 		throw error;
 	}
 	products = data.map(mapProduct);
+	hasLoadedProducts = true;
+	reconcileCartWithProducts();
 }
 
 async function loadOrders() {
@@ -367,6 +529,8 @@ async function saveProduct(product) {
 	const { error } = await supabaseClient.from("products").upsert({
 		id: product.id,
 		name: product.name,
+		brand: product.brand,
+		image_url: product.imageUrl,
 		price: product.price,
 		category: product.category,
 		sale_mode: product.saleMode,
@@ -377,14 +541,51 @@ async function saveProduct(product) {
 	}
 }
 
+function debounce(callback, delayMs = 150) {
+	let timerId;
+	return function (...args) {
+		window.clearTimeout(timerId);
+		timerId = window.setTimeout(() => callback.apply(this, args), delayMs);
+	};
+}
+
 function getBackendError(error) {
-	return error?.message || "Ocurrió un error al comunicarse con la tienda.";
+	if (!error) {
+		return "Ocurrió un error al comunicarse con la tienda.";
+	}
+	if (typeof error === "string") {
+		return error;
+	}
+	const main = error.message || error.error_description || "Ocurrió un error al comunicarse con la tienda.";
+	if (error.details && typeof error.details === "string" && error.details !== main) {
+		return `${main} (${error.details})`;
+	}
+	return main;
 }
 
 async function refreshStoreData() {
+	if (!hasLoadedProducts && !catalogLoadError) {
+		catalogLoading.hidden = false;
+		if (!catalogLoadTimeoutId) {
+			catalogLoading.classList.remove("catalog-loading-error");
+			catalogLoadingMessage.textContent = "Cargando productos frescos…";
+			catalogRetryButton.hidden = true;
+			catalogLoadTimeoutId = window.setTimeout(() => {
+				catalogLoadTimeoutId = 0;
+				if (!hasLoadedProducts) {
+					catalogLoadError = true;
+					catalogLoading.classList.add("catalog-loading-error");
+					catalogLoadingMessage.textContent = "La tienda está tardando en responder. Revisa tu conexión.";
+					catalogRetryButton.hidden = false;
+				}
+			}, 8000);
+		}
+	}
 	try {
-		await loadProducts();
-		await loadOrders();
+		await Promise.all([loadProducts(), loadOrders()]);
+		window.clearTimeout(catalogLoadTimeoutId);
+		catalogLoadTimeoutId = 0;
+		catalogLoadError = false;
 		renderProducts();
 		renderCart();
 		renderSales();
@@ -393,7 +594,17 @@ async function refreshStoreData() {
 			renderPurchaseReviews(activeReviewOrderId);
 		}
 	} catch (error) {
+		window.clearTimeout(catalogLoadTimeoutId);
+		catalogLoadTimeoutId = 0;
+		if (!hasLoadedProducts) {
+			catalogLoadError = true;
+			catalogLoading.hidden = false;
+			catalogLoading.classList.add("catalog-loading-error");
+			catalogLoadingMessage.textContent = "No se pudo cargar el catálogo. Comprueba tu conexión e inténtalo de nuevo.";
+			catalogRetryButton.hidden = false;
+		}
 		catalogFeedback.textContent = `No se pudieron cargar los datos compartidos: ${getBackendError(error)}`;
+		renderProducts();
 	}
 	await refreshReviewSummary();
 }
@@ -401,68 +612,100 @@ async function refreshStoreData() {
 function loadCachedRate() {
 	try {
 		const cachedRate = JSON.parse(localStorage.getItem(RATE_STORAGE_KEY) || "null");
-		return cachedRate && Number.isFinite(cachedRate.value) && cachedRate.value > 0 ? cachedRate : null;
+		if (cachedRate && Number.isFinite(cachedRate.value) && cachedRate.value > 0) {
+			return cachedRate;
+		}
 	} catch {
-		return null;
+		// El navegador puede bloquear el almacenamiento local.
 	}
+	return null;
 }
 
 async function loadDailyRate() {
-	if (isLoadingExchangeRate || document.visibilityState === "hidden") {
+	if (isLoadingExchangeRate) {
 		return;
 	}
 	isLoadingExchangeRate = true;
-	const updatedLabel = document.querySelector("#rate-updated");
-	if (exchangeRate && !hasAttemptedExchangeRateLoad) {
+	if (exchangeRate) {
 		renderExchangeRate("Tasa guardada · ");
 	}
 
+	const controller = new AbortController();
+	const timeoutId = window.setTimeout(() => controller.abort(), 6000);
 	try {
-		const response = await fetch(RATE_ENDPOINT, { cache: "no-store" });
+		const response = await fetch(RATE_ENDPOINT, {
+			cache: "no-store",
+			signal: controller.signal
+		});
 		if (!response.ok) {
-			throw new Error("No se pudo consultar la tasa.");
+			throw new Error(`El servicio respondió con estado ${response.status}.`);
 		}
 		const data = await response.json();
-		if (!Number.isFinite(data.promedio) || data.promedio <= 0 || !data.fechaActualizacion) {
-			throw new Error("La respuesta de la tasa no es válida.");
+		if (!Number.isFinite(data.promedio) || data.promedio <= 0) {
+			throw new Error("El servicio devolvió una tasa no válida.");
 		}
-		exchangeRate = { value: data.promedio, date: data.fechaActualizacion };
-		localStorage.setItem(RATE_STORAGE_KEY, JSON.stringify(exchangeRate));
-		hasAttemptedExchangeRateLoad = true;
-		renderExchangeRate();
+		exchangeRate = {
+			value: data.promedio,
+			date: data.fechaActualizacion || new Date().toISOString()
+		};
+		try {
+			localStorage.setItem(RATE_STORAGE_KEY, JSON.stringify(exchangeRate));
+		} catch {
+			// La tasa actualizada sigue disponible aunque el navegador bloquee el almacenamiento.
+		}
+		renderExchangeRate("Tasa oficial BCV · ");
 		renderProducts();
 		renderCart();
 	} catch {
-		hasAttemptedExchangeRateLoad = true;
 		if (exchangeRate) {
-			renderExchangeRate("Sin conexión · última tasa guardada · ");
+			renderExchangeRate("Tasa guardada · ");
 		} else {
-			document.querySelector("#daily-rate-value").textContent = "No disponible";
-			updatedLabel.textContent = "Conéctate para actualizar";
-			document.querySelector("#shopping-rate-value").textContent = "No disponible";
-			document.querySelector("#shopping-rate-updated").textContent = "Conéctate para actualizar";
-			renderProducts();
-			renderCart();
+			const dailyRate = document.querySelector("#daily-rate-value");
+			const shoppingRate = document.querySelector("#shopping-rate-value");
+			const updatedLabel = document.querySelector("#rate-updated");
+			const shoppingUpdatedLabel = document.querySelector("#shopping-rate-updated");
+			if (dailyRate) dailyRate.textContent = "No disponible";
+			if (shoppingRate) shoppingRate.textContent = "No disponible";
+			if (updatedLabel) updatedLabel.textContent = "Tasa oficial no disponible";
+			if (shoppingUpdatedLabel) shoppingUpdatedLabel.textContent = "Tasa oficial no disponible";
 		}
 	} finally {
+		window.clearTimeout(timeoutId);
 		isLoadingExchangeRate = false;
 	}
 }
 
 function renderExchangeRate(prefix = "Fecha valor · ") {
+	if (!exchangeRate || !Number.isFinite(exchangeRate.value)) {
+		return;
+	}
 	const formattedRate = new Intl.NumberFormat("es-VE", {
 		minimumFractionDigits: 2,
 		maximumFractionDigits: 4
 	}).format(exchangeRate.value);
-	document.querySelector("#daily-rate-value").textContent = `Bs ${formattedRate}`;
-	document.querySelector("#shopping-rate-value").textContent = `Bs ${formattedRate}`;
-	const updatedDate = `${prefix}${new Intl.DateTimeFormat("es-VE", {
-		day: "numeric",
-		month: "short",
-		year: "numeric"
-	}).format(new Date(exchangeRate.date))}`;
-	document.querySelector("#rate-updated").textContent = updatedDate;
-	document.querySelector("#shopping-rate-updated").textContent = updatedDate;
+	const dailyRate = document.querySelector("#daily-rate-value");
+	const shoppingRate = document.querySelector("#shopping-rate-value");
+	if (dailyRate) dailyRate.textContent = "Bs " + formattedRate;
+	if (shoppingRate) shoppingRate.textContent = "Bs " + formattedRate;
+
+	let formattedDate = "";
+	try {
+		formattedDate = prefix + new Intl.DateTimeFormat("es-VE", {
+			day: "numeric",
+			month: "short",
+			year: "numeric"
+		}).format(new Date(exchangeRate.date));
+	} catch {
+		formattedDate = prefix + new Intl.DateTimeFormat("es-VE", {
+			day: "numeric",
+			month: "short",
+			year: "numeric"
+		}).format(new Date());
+	}
+	const updatedLabel = document.querySelector("#rate-updated");
+	const shoppingUpdatedLabel = document.querySelector("#shopping-rate-updated");
+	if (updatedLabel) updatedLabel.textContent = formattedDate;
+	if (shoppingUpdatedLabel) shoppingUpdatedLabel.textContent = formattedDate;
 }
 
 async function refreshReviewSummary() {
@@ -517,10 +760,38 @@ async function applySession(session) {
 	await refreshStoreData();
 }
 
+async function loadLocalSupabaseConfig() {
+	await new Promise((resolve, reject) => {
+		const script = document.createElement("script");
+		script.src = "SUPABASE_CONFIG.LOCAL.JS";
+		script.addEventListener("load", resolve, { once: true });
+		script.addEventListener("error", () => reject(new Error("No se encontró SUPABASE_CONFIG.LOCAL.JS.")), { once: true });
+		document.head.append(script);
+	});
+}
+
 async function initializeBackend() {
-	const config = window.LA_TIENDITA_SUPABASE;
+	let config = window.LA_TIENDITA_SUPABASE;
+	const localHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+	if ((!config?.url || !config?.anonKey) && window.location.protocol === "file:") {
+		catalogFeedback.textContent = "Para iniciar sesión en una vista local, abre INICIO.HTML con Live Server en VS Code y configura SUPABASE_CONFIG.LOCAL.JS.";
+		checkoutButton.disabled = true;
+		return;
+	}
+	if ((!config?.url || !config?.anonKey) && localHost) {
+		try {
+			await loadLocalSupabaseConfig();
+			config = window.LA_TIENDITA_SUPABASE;
+		} catch (error) {
+			catalogFeedback.textContent = `${error.message} Créalo en la carpeta del proyecto con tu Project URL y clave Publishable/anon.`;
+			checkoutButton.disabled = true;
+			return;
+		}
+	}
 	if (!config?.url || !config?.anonKey) {
-		catalogFeedback.textContent = "La tienda compartida aún no está configurada. Añade SUPABASE_URL y SUPABASE_ANON_KEY en los secretos de GitHub Actions.";
+		catalogFeedback.textContent = localHost
+			? "La vista local aún no está configurada. Completa SUPABASE_CONFIG.LOCAL.JS con tu Project URL y clave Publishable/anon."
+			: "La tienda compartida aún no está configurada. Añade SUPABASE_URL y SUPABASE_ANON_KEY en los secretos de GitHub Actions.";
 		checkoutButton.disabled = true;
 		return;
 	}
@@ -592,6 +863,41 @@ function getDiscountedPrice(price) {
 	return price > DISCOUNT_THRESHOLD ? price * (1 - DISCOUNT_RATE) : price;
 }
 
+function createInterfaceIcon(name) {
+	const paths = {
+		bag: "M6 8h12l1 13H5L6 8Zm3 0a3 3 0 0 1 6 0",
+		chart: "M4 19V5m0 14h17M8 15l4-4 3 2 5-6",
+		box: "m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8m-9 5v9",
+		pin: "M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Zm-5 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+		map: "M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15",
+		info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-11v6m0-10h.01",
+		clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-16v6l4 2",
+		check: "m5 12 4 4L19 6",
+		receipt: "M5 3h14v18l-3-2-4 2-4-2-3 2V3Zm4 5h6m-6 4h6",
+		trend: "M4 17l6-6 4 4 6-8m-6 0h6v6",
+		search: "m20 20-4.5-4.5M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z",
+		meat: "M4 14c-2-3 1-8 6-9 4-1 8 2 9 6 1 4-2 8-6 9-4 1-7-2-9-6Zm5-4h.01m5 7h.01m2-9 2-2",
+		cheese: "m4 10 15-6 2 6v10H4V10Zm0 0 15 0m-9 0v3m5-3v2m-6 4h.01m5 2h.01",
+		basket: "M3 10h18l-2 10H5L3 10Zm4 0 5-7 5 7m-9 4v3m5-3v3",
+		drink: "M7 3h10l-1 18H8L7 3Zm1 5h8m-5-8v3",
+		milk: "M8 3h8l2 4v14H6V7l2-4Zm0 4h10m-8 4h6",
+		leaf: "M20 4C10 4 5 8 5 14c0 3 2 5 5 5 6 0 10-5 10-15ZM4 21c2-5 6-9 12-13"
+	};
+	const svgNamespace = "http://www.w3.org/2000/svg";
+	const svg = document.createElementNS(svgNamespace, "svg");
+	svg.setAttribute("viewBox", "0 0 24 24");
+	svg.setAttribute("fill", "none");
+	svg.setAttribute("stroke", "currentColor");
+	svg.setAttribute("stroke-width", "1.7");
+	svg.setAttribute("stroke-linecap", "round");
+	svg.setAttribute("stroke-linejoin", "round");
+	svg.setAttribute("focusable", "false");
+	const path = document.createElementNS(svgNamespace, "path");
+	path.setAttribute("d", paths[name] || paths.basket);
+	svg.append(path);
+	return svg;
+}
+
 function showFeedback(message, isError = false) {
 	formFeedback.textContent = message;
 	formFeedback.classList.toggle("error", isError);
@@ -656,11 +962,18 @@ function distanceBetween(first, second) {
 	const arc = Math.sin(latitudeDifference / 2) ** 2 +
 		Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) *
 		Math.sin(longitudeDifference / 2) ** 2;
-	return 6371 * 2 * Math.atan2(Math.sqrt(arc), Math.sqrt(1 - arc));
+	const boundedArc = Math.min(1, Math.max(0, arc));
+	return 6371 * 2 * Math.atan2(Math.sqrt(boundedArc), Math.sqrt(1 - boundedArc));
+}
+
+function hasValidCoordinates(point) {
+	return Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude) &&
+		point.latitude >= -90 && point.latitude <= 90 &&
+		point.longitude >= -180 && point.longitude <= 180;
 }
 
 function updateDeliveryEstimate() {
-	if (!deliveryCoordinates) {
+	if (!hasValidCoordinates(deliveryCoordinates)) {
 		deliveryFee = 0;
 		deliveryEstimate.hidden = true;
 		return;
@@ -670,7 +983,7 @@ function updateDeliveryEstimate() {
 	deliveryFee = zone * DELIVERY_ZONE_PRICE;
 	deliveryFeeLabel.textContent = formatMoney(deliveryFee);
 	deliveryFeeBsLabel.textContent = formatBolivars(deliveryFee);
-	deliveryZoneDescription.textContent = `Zona ${zone} · ${distanceKm.toFixed(1)} km desde Caracas centro`;
+	deliveryZoneDescription.textContent = `Zona ${zone} · ${distanceKm.toFixed(1)} km en línea recta`;
 	deliveryEstimate.hidden = false;
 	if (cart.length > 0) {
 		renderCart();
@@ -678,13 +991,42 @@ function updateDeliveryEstimate() {
 }
 
 function renderProducts() {
-	const searchTerm = searchInput.value.trim().toLocaleLowerCase("es");
+	catalogLoading.hidden = hasLoadedProducts;
+	categoryFilters.hidden = !hasLoadedProducts;
+	catalogToolbar.hidden = !hasLoadedProducts;
+	emptyState.hidden = !hasLoadedProducts || products.length > 0;
+	noResults.hidden = !hasLoadedProducts || products.length === 0;
+	const searchTerm = normalizeProductText(searchInput.value);
 	const visibleProducts = products.filter((product) =>
-		product.name.toLocaleLowerCase("es").includes(searchTerm) &&
-		(activeCategory === "Todos" || product.category === activeCategory)
+		normalizeProductText(`${product.name} ${product.brand} ${product.category}`).includes(searchTerm) &&
+		(activeCategory === "Todos" || product.category === activeCategory) &&
+		(!showAvailableOnly || product.stock > 0)
 	);
+	const sortComparators = {
+		recommended: (first, second) =>
+			Number(second.stock > 0) - Number(first.stock > 0) ||
+			Number(getDiscountedPrice(second.price) < second.price) - Number(getDiscountedPrice(first.price) < first.price) ||
+			first.name.localeCompare(second.name, "es"),
+		"price-low": (first, second) =>
+			getDiscountedPrice(first.price) - getDiscountedPrice(second.price) || first.name.localeCompare(second.name, "es"),
+		"price-high": (first, second) =>
+			getDiscountedPrice(second.price) - getDiscountedPrice(first.price) || first.name.localeCompare(second.name, "es"),
+		name: (first, second) => first.name.localeCompare(second.name, "es")
+	};
+	visibleProducts.sort(sortComparators[catalogSort.value] || sortComparators.recommended);
+	document.querySelectorAll("[data-category-count]").forEach((count) => {
+		count.textContent = String(
+			count.dataset.categoryCount === "Todos"
+				? products.length
+				: products.filter((product) => product.category === count.dataset.categoryCount).length
+		);
+	});
+	catalogResultsCount.textContent = `${visibleProducts.length} de ${products.length} ${products.length === 1 ? "producto" : "productos"}`;
+	clearCatalogFiltersButton.hidden = !searchTerm && activeCategory === "Todos" && !showAvailableOnly && catalogSort.value === "recommended";
+	noResults.textContent = showAvailableOnly && products.some((product) => product.stock > 0)
+		? "No encontramos productos disponibles con esos filtros."
+		: "No encontramos productos con esos filtros.";
 	catalogProducts.replaceChildren();
-	productList.replaceChildren();
 
 	for (const product of visibleProducts) {
 		const discountedPrice = getDiscountedPrice(product.price);
@@ -695,13 +1037,42 @@ function renderProducts() {
 		const visual = document.createElement("div");
 		const normalizedCategory = product.category.toLocaleLowerCase("es").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 		visual.className = `product-card-visual category-${normalizedCategory}`;
-		visual.setAttribute("aria-hidden", "true");
-		visual.textContent = ({ Carnes: "🥩", "Charcutería": "🧀", Víveres: "🛒", Bebidas: "🥤", "Lácteos": "🥛", Otros: "🌿" })[product.category];
+		const categoryIcons = {
+			carnes: "meat",
+			charcuteria: "cheese",
+			viveres: "basket",
+			bebidas: "drink",
+			lacteos: "milk",
+			otros: "leaf"
+		};
+		const imageUrl = getSafeProductImageUrl(product.imageUrl || "");
+		if (imageUrl) {
+			const image = document.createElement("img");
+			image.className = "product-card-image";
+			visual.classList.add("product-card-visual-has-image");
+			image.alt = [product.brand, product.name].filter(Boolean).join(" ");
+			image.loading = "lazy";
+			image.decoding = "async";
+			image.addEventListener("error", () => {
+				image.remove();
+				visual.classList.remove("product-card-visual-has-image");
+				visual.setAttribute("aria-hidden", "true");
+				visual.append(createInterfaceIcon(categoryIcons[normalizedCategory] || "basket"));
+			}, { once: true });
+			visual.append(image);
+			image.src = imageUrl;
+		} else {
+			visual.setAttribute("aria-hidden", "true");
+			visual.append(createInterfaceIcon(categoryIcons[normalizedCategory] || "basket"));
+		}
 		const details = document.createElement("div");
 		details.className = "product-card-details";
 		const category = document.createElement("span");
 		category.className = "product-category-label";
 		category.textContent = product.category;
+		const brand = document.createElement("span");
+		brand.className = "product-card-brand";
+		brand.textContent = product.brand || "";
 		const status = document.createElement("span");
 		status.className = `product-status${product.stock === 0 ? " sold-out" : lowStock ? " low-stock" : ""}`;
 		status.textContent = product.stock === 0
@@ -735,7 +1106,11 @@ function renderProducts() {
 		bolivarPrice.className = "rate-price";
 		bolivarPrice.textContent = formatBolivars(discountedPrice);
 		price.append(bolivarPrice);
-		details.append(category, status, name, price);
+		details.append(category);
+		if (product.brand) {
+			details.append(brand);
+		}
+		details.append(status, name, price);
 
 		const controls = document.createElement("div");
 		controls.className = "product-card-controls";
@@ -797,8 +1172,8 @@ function renderProducts() {
 		catalogProducts.append(card);
 	}
 
-	emptyState.hidden = products.length > 0;
-	noResults.hidden = products.length === 0 || visibleProducts.length > 0;
+	emptyState.hidden = !hasLoadedProducts || products.length > 0;
+	noResults.hidden = !hasLoadedProducts || products.length === 0 || visibleProducts.length > 0;
 	renderAdminProducts();
 	document.querySelector("#product-count").textContent = String(products.length);
 	const unitStock = products
@@ -826,10 +1201,10 @@ function renderProducts() {
 }
 
 function renderAdminProducts() {
-	const searchTerm = inventorySearchInput.value.trim().toLocaleLowerCase("es");
+	const searchTerm = normalizeProductText(inventorySearchInput.value);
 	const filter = stockFilter.value;
 	const visibleProducts = products.filter((product) => {
-		const matchesName = product.name.toLocaleLowerCase("es").includes(searchTerm);
+		const matchesName = normalizeProductText(`${product.name} ${product.brand}`).includes(searchTerm);
 		const matchesStock = filter === "all" ||
 			(filter === "available" && product.stock > 0) ||
 			(filter === "out" && product.stock === 0) ||
@@ -841,7 +1216,15 @@ function renderAdminProducts() {
 	for (const product of visibleProducts) {
 		const row = document.createElement("tr");
 		const nameCell = document.createElement("td");
-		nameCell.textContent = product.name;
+		nameCell.className = "product-name-cell";
+		const productName = document.createElement("span");
+		productName.textContent = product.name;
+		nameCell.append(productName);
+		if (product.brand) {
+			const productBrand = document.createElement("small");
+			productBrand.textContent = product.brand;
+			nameCell.append(productBrand);
+		}
 		const categoryCell = document.createElement("td");
 		categoryCell.textContent = product.category;
 		const priceCell = document.createElement("td");
@@ -1078,7 +1461,7 @@ function renderSales() {
 	pendingOrderCount.textContent = String(pendingOrders.length);
 	pendingOrderCount.hidden = pendingOrders.length === 0;
 
-	const searchTerm = salesSearchInput.value.trim().toLocaleLowerCase("es");
+	const searchTerm = normalizeProductText(salesSearchInput.value);
 	const visibleOrders = orders.filter((order) => {
 		const matchesStatus = salesStatusFilter.value === "all" || order.status === salesStatusFilter.value;
 		const searchableText = [
@@ -1087,8 +1470,8 @@ function renderSales() {
 			order.paymentMethod,
 			order.delivery?.location || "",
 			...order.items.map((item) => item.name)
-		].join(" ").toLocaleLowerCase("es");
-		return matchesStatus && (!searchTerm || searchableText.includes(searchTerm));
+		].join(" ");
+		return matchesStatus && (!searchTerm || normalizeProductText(searchableText).includes(searchTerm));
 	});
 	salesOrdersList.replaceChildren();
 	for (const order of visibleOrders) {
@@ -1201,6 +1584,10 @@ function openPurchaseReviewDialog(orderId) {
 }
 
 async function updateOrderStatus(orderId, nextStatus) {
+	if (!supabaseClient) {
+		salesFeedback.textContent = "La tienda no está conectada.";
+		return;
+	}
 	const order = orders.find((entry) => entry.id === orderId);
 	if (!order || !(
 		(order.status === "pending" && ["accepted", "rejected"].includes(nextStatus)) ||
@@ -1234,6 +1621,9 @@ function beginProductEdit(product) {
 	editingProductId = product.id;
 	lastSuggestedProductCategory = null;
 	productNameInput.value = product.name;
+	productBrandInput.value = product.brand || "";
+	productImageUrlInput.value = product.imageUrl || "";
+	updateProductImagePreview();
 	productCategoryInput.value = product.category;
 	productCategoryHint.textContent = "La categoría no cambiará automáticamente mientras editas.";
 	productSaleModeInput.value = product.saleMode;
@@ -1251,6 +1641,7 @@ function cancelProductEdit() {
 	editingProductId = null;
 	lastSuggestedProductCategory = null;
 	productForm.reset();
+	updateProductImagePreview();
 	productCategoryHint.textContent = "";
 	configureProductFormMode();
 	document.querySelector("#submit-product-button").textContent = "＋ Agregar al inventario";
@@ -1484,6 +1875,11 @@ function renderCart() {
 	checkoutTotal.textContent = formatMoney(total);
 	document.querySelector("#checkout-total-bs").textContent = formatBolivars(total);
 	checkoutButton.disabled = cart.length === 0;
+	mobileCartCount.textContent = `${cart.length} ${cart.length === 1 ? "producto" : "productos"}`;
+	mobileCartTotal.textContent = formatMoney(total);
+	mobileCartSummary.hidden = cart.length === 0;
+	document.body.classList.toggle("has-cart-mobile", cart.length > 0);
+	saveCart();
 }
 
 function openCheckout() {
@@ -1495,7 +1891,7 @@ function openCheckout() {
 		accountDialog.showModal();
 		return;
 	}
-	if (deliveryToggle.checked && !deliveryCoordinates) {
+	if (deliveryToggle.checked && !hasValidCoordinates(deliveryCoordinates)) {
 		deliveryFeedback.textContent = "Marca el punto de entrega en el mapa para calcular la zona y el costo.";
 		openMapPickerButton.focus();
 		return;
@@ -1503,14 +1899,11 @@ function openCheckout() {
 	deliveryFeedback.textContent = "";
 	checkoutFeedback.textContent = "";
 	checkoutForm.reset();
-	checkoutForm.querySelectorAll(".payment-details").forEach((details) => {
-		details.hidden = true;
-	});
 	checkoutTotal.textContent = formatMoney(getOrderTotal());
 	document.querySelector("#checkout-total-bs").textContent = formatBolivars(getOrderTotal());
 	checkoutDelivery.hidden = !deliveryToggle.checked;
 	checkoutDelivery.textContent = deliveryToggle.checked
-		? `Delivery · ${getDeliveryLocation()} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)}) · Coordina la entrega directamente con la tienda.`
+		? `Delivery · ${getDeliveryLocation()} · ${deliveryZoneDescription.textContent} · ${formatMoney(deliveryFee)} (${formatBolivars(deliveryFee)}) · Coordina la entrega directamente con la tienda.`
 		: "";
 	checkoutDialog.showModal();
 }
@@ -1614,6 +2007,7 @@ function updateDeliveryMap() {
 
 function openMapPicker() {
 	mapSuggestionRequestId++;
+	mapReverseGeocodeRequestId++;
 	hideMapSuggestions();
 	mapPickerCoordinates = deliveryCoordinates
 		? { ...deliveryCoordinates }
@@ -1635,6 +2029,13 @@ function openMapPicker() {
 				window.google.maps.event.trigger(mapPickerMap, "resize");
 				mapPickerMap.setCenter({ lat: mapCenter.latitude, lng: mapCenter.longitude });
 				mapPickerMap.setZoom(mapPickerCoordinates ? 16 : 12);
+			} else if (mapPickerProvider === "mapbox") {
+				mapPickerMap.resize();
+				mapPickerMap.jumpTo({
+					center: [mapCenter.longitude, mapCenter.latitude],
+					zoom: mapPickerCoordinates ? 16 : 13
+				});
+				scheduleNearbyPlacesSearch();
 			} else {
 				mapPickerMap.invalidateSize({ pan: false });
 				mapPickerMap.setView(
@@ -1643,7 +2044,6 @@ function openMapPicker() {
 					{ animate: false }
 				);
 			}
-			loadNearbyPlaces();
 		}
 	}, 100);
 }
@@ -1689,9 +2089,453 @@ function loadGoogleMapsApi() {
 }
 
 window.gm_authFailure = () => {
-	mapPickerFeedback.textContent = "Google Maps rechazó la clave. Verifica las API habilitadas y la restricción del dominio.";
-	mapBusinessFeedback.textContent = "No se pudieron cargar los comercios de Google Maps.";
+	const message = "Google Maps rechazó la clave. Se activará el mapa interactivo abierto.";
+	mapPickerFeedback.textContent = message;
+	mapPickerProvider = null;
+	mapPickerMap = null;
+	mapPickerMarker = null;
+	if (mapPickerMapElement) {
+		mapPickerMapElement.replaceChildren();
+	}
+	void updateMapPicker();
 };
+
+function loadLeafletLibrary() {
+	if (window.L) {
+		return Promise.resolve(window.L);
+	}
+	if (leafletLibraryPromise) {
+		return leafletLibraryPromise;
+	}
+	leafletLibraryPromise = new Promise((resolve, reject) => {
+		const script = document.createElement("script");
+		let timeoutId = window.setTimeout(() => {
+			leafletLibraryPromise = null;
+			reject(new Error("Leaflet tardó demasiado en responder."));
+		}, 12000);
+		script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+		script.addEventListener("load", () => {
+			window.clearTimeout(timeoutId);
+			timeoutId = 0;
+			if (window.L) {
+				resolve(window.L);
+			} else {
+				leafletLibraryPromise = null;
+				reject(new Error("No se pudo inicializar Leaflet."));
+			}
+		}, { once: true });
+		script.addEventListener("error", () => {
+			window.clearTimeout(timeoutId);
+			timeoutId = 0;
+			leafletLibraryPromise = null;
+			reject(new Error("No se pudo cargar Leaflet."));
+		}, { once: true });
+		document.head.append(script);
+	});
+	return leafletLibraryPromise;
+}
+
+function loadMapboxLibrary() {
+	if (window.mapboxgl) {
+		window.mapboxgl.accessToken = window.MAPBOX_PUBLIC_TOKEN;
+		return Promise.resolve(window.mapboxgl);
+	}
+	if (!window.MAPBOX_PUBLIC_TOKEN) {
+		return Promise.reject(new Error("No hay un token público de Mapbox configurado."));
+	}
+	if (mapboxLibraryPromise) {
+		return mapboxLibraryPromise;
+	}
+	mapboxLibraryPromise = new Promise((resolve, reject) => {
+		const stylesheetHref = "https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css";
+		if (!document.querySelector(`link[href="${stylesheetHref}"]`)) {
+			const stylesheet = document.createElement("link");
+			stylesheet.rel = "stylesheet";
+			stylesheet.href = stylesheetHref;
+			document.head.append(stylesheet);
+		}
+		const script = document.createElement("script");
+		const timeoutId = window.setTimeout(() => {
+			mapboxLibraryPromise = null;
+			reject(new Error("Mapbox tardó demasiado en responder."));
+		}, 15000);
+		script.src = "https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js";
+		script.addEventListener("load", () => {
+			window.clearTimeout(timeoutId);
+			if (!window.mapboxgl) {
+				mapboxLibraryPromise = null;
+				reject(new Error("No se pudo inicializar Mapbox GL JS."));
+				return;
+			}
+			window.mapboxgl.accessToken = window.MAPBOX_PUBLIC_TOKEN;
+			resolve(window.mapboxgl);
+		}, { once: true });
+		script.addEventListener("error", () => {
+			window.clearTimeout(timeoutId);
+			mapboxLibraryPromise = null;
+			reject(new Error("No se pudo cargar Mapbox GL JS."));
+		}, { once: true });
+		document.head.append(script);
+	});
+	return mapboxLibraryPromise;
+}
+
+async function initializeMapboxMap() {
+	await loadMapboxLibrary();
+	if (!window.mapboxgl.supported()) {
+		throw new Error("Este navegador no es compatible con Mapbox.");
+	}
+	const center = mapPickerCoordinates || DELIVERY_ORIGIN;
+	mapPickerMapElement.replaceChildren();
+	mapPickerMap = new window.mapboxgl.Map({
+		container: mapPickerMapElement,
+		style: "mapbox://styles/mapbox/streets-v12",
+		center: [center.longitude, center.latitude],
+		zoom: mapPickerCoordinates ? 16 : 13,
+		attributionControl: true
+	});
+	mapPickerProvider = "mapbox";
+	mapPickerMap.addControl(new window.mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+	mapPickerMapStatusMessage.textContent = "Cargando el mapa de Mapbox…";
+	mapPickerMapStatus.hidden = false;
+	retryMapLoadButton.hidden = true;
+	await new Promise((resolve, reject) => {
+		let settled = false;
+		const timeoutId = window.setTimeout(() => {
+			if (!settled) {
+				settled = true;
+				reject(new Error("El mapa de Mapbox tardó demasiado en cargar."));
+			}
+		}, 20000);
+		mapPickerMap.once("load", () => {
+			window.clearTimeout(timeoutId);
+			if (settled) {
+				return;
+			}
+			settled = true;
+			resolve();
+		});
+		mapPickerMap.on("error", (event) => {
+			if (!settled && event.error) {
+				window.clearTimeout(timeoutId);
+				settled = true;
+				reject(event.error);
+			}
+		});
+	});
+	mapPickerMapStatus.hidden = true;
+	mapPickerMarker = new window.mapboxgl.Marker({ color: "#b54836", draggable: true })
+		.setLngLat([center.longitude, center.latitude]);
+	mapPickerMarker.on("dragend", () => {
+		const position = mapPickerMarker.getLngLat();
+		void setMapPickerSelection({ lat: position.lat, lng: position.lng });
+	});
+	if (mapPickerCoordinates) {
+		mapPickerMarker.addTo(mapPickerMap);
+	}
+	mapPickerMap.on("click", (event) => {
+		void setMapPickerSelection({ lat: event.lngLat.lat, lng: event.lngLat.lng }, true);
+	});
+	mapPickerMap.on("moveend", scheduleNearbyPlacesSearch);
+	mapBusinessFeedback.textContent = "Mapa de Mapbox listo. Abastos y comercios se cargan como referencias.";
+	scheduleNearbyPlacesSearch();
+}
+
+function discardMapboxMap() {
+	if (mapPickerProvider === "mapbox" && mapPickerMap) {
+		mapPickerMap.remove();
+		mapPickerMap = null;
+		mapPickerMarker = null;
+		mapNearbyMarkers = [];
+		mapNearbyLayer = null;
+		mapPickerProvider = null;
+	}
+}
+
+async function initializeLeafletMap() {
+	if (!window.L) {
+		mapPickerMapStatusMessage.textContent = "Cargando el mapa interactivo…";
+		mapPickerMapStatus.hidden = false;
+		retryMapLoadButton.hidden = true;
+		try {
+			await loadLeafletLibrary();
+		} catch (error) {
+			mapPickerMapStatusMessage.textContent = `${error.message} Revisa tu conexión e inténtalo de nuevo.`;
+			retryMapLoadButton.hidden = false;
+			mapPickerFeedback.textContent = "El selector no estará disponible hasta que cargue el mapa.";
+			return false;
+		}
+	}
+	const center = mapPickerCoordinates || DELIVERY_ORIGIN;
+	mapPickerMapElement.replaceChildren();
+	mapPickerMap = window.L.map(mapPickerMapElement, { scrollWheelZoom: true }).setView([center.latitude, center.longitude], mapPickerCoordinates ? 16 : 12);
+	mapPickerProvider = "leaflet";
+	const tileLayer = window.L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+		maxZoom: 19,
+		attribution: "Tiles &copy; Esri & OpenStreetMap"
+	}).addTo(mapPickerMap);
+	tileLayer.once("tileerror", () => {
+		window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+			maxZoom: 19,
+			attribution: "&copy; OpenStreetMap"
+		}).addTo(mapPickerMap);
+	});
+	mapPickerMapStatus.hidden = true;
+	retryMapLoadButton.hidden = true;
+	if (mapPickerCoordinates) {
+		mapPickerMarker = window.L.marker([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], { draggable: true }).addTo(mapPickerMap);
+		mapPickerMarker.on("dragend", () => {
+			const pos = mapPickerMarker.getLatLng();
+			void setMapPickerSelection({ lat: pos.lat, lng: pos.lng }, true);
+		});
+	}
+	mapPickerMap.on("click", (event) => {
+		void setMapPickerSelection({ lat: event.latlng.lat, lng: event.latlng.lng }, true);
+	});
+	mapNearbyLayer = window.L.layerGroup().addTo(mapPickerMap);
+	mapPickerMap.on("moveend", scheduleNearbyPlacesSearch);
+	mapBusinessFeedback.textContent = "Mapa interactivo listo. Toca o arrastra el pin para fijar tu entrega.";
+	scheduleNearbyPlacesSearch();
+	return true;
+}
+
+function getNearbyPlaceCategory(properties) {
+	const category = properties.osm_value;
+	const categories = {
+		supermarket: "Supermercado",
+		convenience: "Abasto",
+		grocery: "Abasto",
+		greengrocer: "Frutas y verduras",
+		bakery: "Panadería",
+		butcher: "Carnicería",
+		mall: "Centro comercial",
+		shopping_mall: "Centro comercial",
+		pharmacy: "Farmacia"
+	};
+	return categories[category] || (properties.osm_key === "amenity" ? "Punto de referencia" : "Comercio");
+}
+
+function getNearbyPlaceIcon(category) {
+	if (category === "Supermercado") {
+		return "S";
+	}
+	if (category === "Abasto") {
+		return "A";
+	}
+	if (category === "Farmacia") {
+		return "F";
+	}
+	if (category === "Centro comercial") {
+		return "C";
+	}
+	return "•";
+}
+
+function getNearbyPlacesCacheKey(center) {
+	return `${center.latitude.toFixed(3)},${center.longitude.toFixed(3)}`;
+}
+
+function scheduleNearbyPlacesSearch() {
+	nearbyPlacesRequestId++;
+	window.clearTimeout(nearbyPlacesSearchTimer);
+	nearbyPlacesSearchTimer = window.setTimeout(() => {
+		void loadNearbyPlaces();
+	}, 700);
+}
+
+async function fetchNearbyPlaces(center) {
+	const terms = ["abasto", "supermercado", "farmacia", "centro comercial"];
+	const responses = await Promise.allSettled(terms.map(async (term) => {
+		const searchUrl = new URL("https://photon.komoot.io/api/");
+		searchUrl.searchParams.set("q", term);
+		searchUrl.searchParams.set("limit", "12");
+		searchUrl.searchParams.set("lat", String(center.latitude));
+		searchUrl.searchParams.set("lon", String(center.longitude));
+		const controller = new AbortController();
+		const timeoutId = window.setTimeout(() => controller.abort(), 9000);
+		let response;
+		try {
+			response = await fetch(searchUrl, { signal: controller.signal });
+		} finally {
+			window.clearTimeout(timeoutId);
+		}
+		if (!response.ok) {
+			throw new Error(`La búsqueda de ${term} respondió HTTP ${response.status}.`);
+		}
+		const data = await response.json();
+		return (data.features || []).map((feature) => {
+			const [longitude, latitude] = feature.geometry?.coordinates || [];
+			const properties = feature.properties || {};
+			if (!hasValidCoordinates({ latitude, longitude })) {
+				return null;
+			}
+			return {
+				id: `${properties.osm_key || ""}/${properties.osm_value || ""}/${properties.osm_id || ""}/${latitude.toFixed(5)}/${longitude.toFixed(5)}`,
+				name: properties.name || formatMapSuggestion(properties) || "Lugar cercano",
+				category: getNearbyPlaceCategory(properties),
+				latitude,
+				longitude
+			};
+		}).filter(Boolean);
+	}));
+	const successfulResponses = responses.filter((response) => response.status === "fulfilled");
+	if (successfulResponses.length === 0) {
+		throw responses.find((response) => response.status === "rejected")?.reason ||
+			new Error("El servicio de lugares cercanos no respondió.");
+	}
+	const uniquePlaces = new Map();
+	for (const response of successfulResponses) {
+		for (const place of response.value) {
+			const distance = distanceBetween(center, place);
+			if (distance > NEARBY_PLACE_RADIUS_KM || uniquePlaces.has(place.id)) {
+				continue;
+			}
+			uniquePlaces.set(place.id, { ...place, distance });
+		}
+	}
+	return [...uniquePlaces.values()]
+		.sort((first, second) => first.distance - second.distance)
+		.slice(0, 14);
+}
+
+function makeNearbyPlacePopup(place) {
+	const popup = document.createElement("div");
+	popup.className = "nearby-place-popup";
+	const name = document.createElement("strong");
+	name.textContent = place.name;
+	const category = document.createElement("span");
+	category.textContent = `${place.category} · ${place.distance.toFixed(1)} km aprox.`;
+	popup.append(name, category);
+	return popup;
+}
+
+function renderNearbyPlaces(places) {
+	if (mapPickerProvider === "mapbox" && window.mapboxgl) {
+		mapNearbyMarkers.forEach((marker) => marker.remove());
+		mapNearbyMarkers = [];
+		nearbyPlacesList.replaceChildren();
+		for (const [index, place] of places.entries()) {
+			const element = document.createElement("div");
+			element.className = `nearby-map-marker nearby-map-marker-${place.category.toLowerCase().replaceAll(" ", "-")}`;
+			element.setAttribute("role", "img");
+			element.setAttribute("aria-label", `${place.name} · ${place.category}`);
+			const markerLabel = document.createElement("span");
+			markerLabel.setAttribute("aria-hidden", "true");
+			markerLabel.textContent = getNearbyPlaceIcon(place.category);
+			element.append(markerLabel);
+			const popup = new window.mapboxgl.Popup({ offset: 18 }).setDOMContent(makeNearbyPlacePopup(place));
+			const marker = new window.mapboxgl.Marker({ element })
+				.setLngLat([place.longitude, place.latitude])
+				.setPopup(popup)
+				.addTo(mapPickerMap);
+			mapNearbyMarkers.push(marker);
+
+			const item = document.createElement("li");
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "nearby-place-button";
+			button.dataset.nearbyPlaceIndex = String(index);
+			const label = document.createElement("strong");
+			label.textContent = place.name;
+			const detail = document.createElement("small");
+			detail.textContent = `${place.category} · ${place.distance.toFixed(1)} km`;
+			button.append(label, detail);
+			item.append(button);
+			nearbyPlacesList.append(item);
+			button.addEventListener("click", () => {
+				mapPickerMap.flyTo({
+					center: [place.longitude, place.latitude],
+					zoom: Math.max(mapPickerMap.getZoom(), 16)
+				});
+				marker.togglePopup();
+			});
+		}
+		mapBusinessFeedback.textContent = places.length
+			? `${places.length} abastos y comercios mapeados a menos de ${NEARBY_PLACE_RADIUS_KM} km. Toca uno para ubicarlo.`
+			: `No encontramos comercios mapeados a menos de ${NEARBY_PLACE_RADIUS_KM} km. La cobertura depende de los datos disponibles.`;
+		return;
+	}
+	if (!mapNearbyLayer || !window.L) {
+		return;
+	}
+	mapNearbyLayer.clearLayers();
+	nearbyPlacesList.replaceChildren();
+	for (const [index, place] of places.entries()) {
+		const marker = window.L.marker([place.latitude, place.longitude], {
+			icon: window.L.divIcon({
+				className: `nearby-map-marker nearby-map-marker-${place.category.toLowerCase().replaceAll(" ", "-")}`,
+				html: `<span aria-hidden="true">${getNearbyPlaceIcon(place.category)}</span>`,
+				iconSize: [30, 30],
+				iconAnchor: [15, 15]
+			}),
+			title: `${place.name} · ${place.category}`
+		}).addTo(mapNearbyLayer);
+		marker.bindPopup(makeNearbyPlacePopup(place));
+
+		const item = document.createElement("li");
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "nearby-place-button";
+		button.dataset.nearbyPlaceIndex = String(index);
+		const label = document.createElement("strong");
+		label.textContent = place.name;
+		const detail = document.createElement("small");
+		detail.textContent = `${place.category} · ${place.distance.toFixed(1)} km`;
+		button.append(label, detail);
+		item.append(button);
+		nearbyPlacesList.append(item);
+		button.addEventListener("click", () => {
+			mapPickerMap.setView([place.latitude, place.longitude], Math.max(mapPickerMap.getZoom(), 16));
+			marker.openPopup();
+		});
+	}
+	mapBusinessFeedback.textContent = places.length
+		? `${places.length} abastos y comercios mapeados a menos de ${NEARBY_PLACE_RADIUS_KM} km. Toca uno para ubicarlo.`
+		: `No encontramos comercios mapeados a menos de ${NEARBY_PLACE_RADIUS_KM} km. La cobertura depende de los datos disponibles.`;
+}
+
+async function loadNearbyPlaces(forceRefresh = false) {
+	if (!["leaflet", "mapbox"].includes(mapPickerProvider) || !mapPickerMap || !mapPickerDialog.open) {
+		return;
+	}
+	const center = getMapPickerCenter();
+	const cacheKey = getNearbyPlacesCacheKey(center);
+	const cached = nearbyPlacesCache.get(cacheKey);
+	if (!forceRefresh && cached && Date.now() - cached.createdAt < NEARBY_PLACES_CACHE_MS) {
+		renderNearbyPlaces(cached.places);
+		return;
+	}
+	const waitMs = NEARBY_PLACES_MIN_INTERVAL_MS - (Date.now() - nearbyPlacesLastRequestAt);
+	if (waitMs > 0) {
+		mapBusinessFeedback.textContent = "Actualizando lugares cercanos…";
+		window.clearTimeout(nearbyPlacesSearchTimer);
+		nearbyPlacesSearchTimer = window.setTimeout(() => {
+			void loadNearbyPlaces(forceRefresh);
+		}, waitMs);
+		return;
+	}
+	const requestId = ++nearbyPlacesRequestId;
+	nearbyPlacesLastRequestAt = Date.now();
+	mapBusinessFeedback.textContent = "Buscando abastos y comercios cercanos…";
+	try {
+		const places = await fetchNearbyPlaces(center);
+		if (requestId !== nearbyPlacesRequestId || !mapPickerDialog.open) {
+			return;
+		}
+		nearbyPlacesCache.set(cacheKey, { createdAt: Date.now(), places });
+		if (nearbyPlacesCache.size > 20) {
+			const oldestKey = nearbyPlacesCache.keys().next().value;
+			nearbyPlacesCache.delete(oldestKey);
+		}
+		renderNearbyPlaces(places);
+	} catch (error) {
+		if (requestId !== nearbyPlacesRequestId) {
+			return;
+		}
+		mapBusinessFeedback.textContent = `No se pudieron cargar los comercios cercanos: ${getBackendError(error)}`;
+		nearbyPlacesList.replaceChildren();
+	}
+}
 
 async function initializeGoogleMap() {
 	await loadGoogleMapsApi();
@@ -1704,7 +2548,8 @@ async function initializeGoogleMap() {
 		streetViewControl: false,
 		fullscreenControl: false
 	});
-	mapPickerProvider = "google";
+	mapPickerMapStatus.hidden = true;
+	retryMapLoadButton.hidden = true;
 	mapPickerMarker = new window.google.maps.Marker({
 		map: mapPickerCoordinates ? mapPickerMap : null,
 		position: { lat: center.latitude, lng: center.longitude },
@@ -1713,7 +2558,7 @@ async function initializeGoogleMap() {
 	mapPickerMarker.addListener("dragend", () => {
 		const position = mapPickerMarker.getPosition();
 		if (position) {
-			void setMapPickerSelection({ lat: position.lat(), lng: position.lng() }, true);
+			void setMapPickerSelection({ lat: position.lat(), lng: position.lng() });
 		}
 	});
 	mapPickerMap.addListener("click", (event) => {
@@ -1721,62 +2566,66 @@ async function initializeGoogleMap() {
 			event.stop();
 			void selectGooglePlace(event.placeId);
 		} else if (event.latLng) {
-			void setMapPickerSelection({ lat: event.latLng.lat(), lng: event.latLng.lng() }, true);
+			void setMapPickerSelection({ lat: event.latLng.lat(), lng: event.latLng.lng() });
 		}
 	});
-	mapPickerMap.addListener("idle", scheduleNearbyPlacesSearch);
-	mapBusinessFeedback.textContent = "Google Maps muestra los comercios y lugares registrados en esta zona.";
+	mapPickerProvider = "google";
+	mapBusinessFeedback.textContent = "Los comercios y lugares disponibles aparecen en Google Maps.";
 }
 
 async function updateMapPicker() {
 	if (!mapPickerMap) {
-		if (window.GOOGLE_MAPS_API_KEY) {
+		const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+		if (isLocalHost) {
+			await Promise.all([loadLocalGoogleMapsConfig(), loadLocalMapboxConfig()]);
+		}
+		let mapInitialized = false;
+		if (window.MAPBOX_PUBLIC_TOKEN) {
+			try {
+				await initializeMapboxMap();
+				mapInitialized = true;
+			} catch {
+				discardMapboxMap();
+				mapPickerMapElement.replaceChildren();
+				mapPickerFeedback.textContent = "Mapbox no está disponible. Se intentará otro mapa; verifica que el token público tenga permisos y referentes correctos.";
+			}
+		}
+		if (!mapInitialized && window.GOOGLE_MAPS_API_KEY) {
 			try {
 				await initializeGoogleMap();
+				mapInitialized = true;
 			} catch (error) {
-				mapPickerFeedback.textContent = `Google Maps no está disponible: ${error.message} Se usará el mapa alternativo.`;
+				mapPickerFeedback.textContent = `Google Maps no está disponible: ${getBackendError(error)}. Se usará el mapa interactivo abierto.`;
 			}
 		}
-		if (!mapPickerMap) {
-			if (!window.L) {
-				mapPickerFeedback.textContent = "El mapa interactivo no está disponible. Revisa tu conexión y abre La Tiendita desde localhost o un sitio HTTPS.";
-				return;
-			}
-			mapPickerMap = L.map(mapPickerMapElement, { scrollWheelZoom: true }).setView([DELIVERY_ORIGIN.latitude, DELIVERY_ORIGIN.longitude], 12);
-			mapPickerProvider = "leaflet";
-			const tileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
-				maxZoom: 19,
-				attribution: "Tiles &copy; Esri"
-			}).addTo(mapPickerMap);
-			mapPlacesLayer = L.layerGroup().addTo(mapPickerMap);
-			mapPickerMap.on("moveend", scheduleNearbyPlacesSearch);
-			loadNearbyPlaces();
-			tileLayer.once("tileerror", () => {
-				mapPickerFeedback.textContent = "No se pudieron cargar las calles del mapa. Prueba de nuevo o busca la dirección y confirma el pin.";
-			});
-			mapPickerMap.on("click", (event) => setMapPickerSelection(event.latlng, true));
-			if (!window.GOOGLE_MAPS_API_KEY) {
-				mapBusinessFeedback.textContent = "Sin clave de Google, se muestran los comercios disponibles en los datos abiertos.";
-			}
+		if (!mapInitialized && !await initializeLeafletMap()) {
+			mapPickerFeedback.textContent = "No se pudo cargar ningún mapa. Revisa tu conexión e inténtalo de nuevo.";
 		}
 	}
-	if (mapPickerCoordinates) {
+	if (mapPickerCoordinates && mapPickerMap) {
 		if (mapPickerProvider === "google") {
 			const position = { lat: mapPickerCoordinates.latitude, lng: mapPickerCoordinates.longitude };
 			mapPickerMap.setCenter(position);
 			mapPickerMap.setZoom(16);
 			mapPickerMarker.setPosition(position);
 			mapPickerMarker.setMap(mapPickerMap);
-		} else {
+		} else if (mapPickerProvider === "mapbox") {
+			const position = [mapPickerCoordinates.longitude, mapPickerCoordinates.latitude];
+			mapPickerMap.jumpTo({ center: position, zoom: 16 });
+			mapPickerMarker.setLngLat(position).addTo(mapPickerMap);
+		} else if (mapPickerProvider === "leaflet") {
 			mapPickerMap.setView([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], 16);
 			if (mapPickerMarker) {
 				mapPickerMarker.setLatLng([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude]);
 			} else {
-				mapPickerMarker = L.marker([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], { draggable: true }).addTo(mapPickerMap);
-				mapPickerMarker.on("dragend", () => setMapPickerSelection(mapPickerMarker.getLatLng(), true));
+				mapPickerMarker = window.L.marker([mapPickerCoordinates.latitude, mapPickerCoordinates.longitude], { draggable: true }).addTo(mapPickerMap);
+				mapPickerMarker.on("dragend", () => {
+					const pos = mapPickerMarker.getLatLng();
+					void setMapPickerSelection({ lat: pos.lat, lng: pos.lng }, true);
+				});
 			}
 		}
-	} else if (mapPickerInput.value.trim()) {
+	} else if (mapPickerInput.value.trim() && mapPickerMap) {
 		void searchMapLocation();
 	}
 	document.querySelector("#map-picker-selection-summary").textContent = mapPickerCoordinates
@@ -1788,100 +2637,6 @@ async function updateMapPicker() {
 	document.querySelector("#open-map-picker-google").href = mapPickerCoordinates
 		? `https://www.google.com/maps/search/?api=1&query=${mapPickerCoordinates.latitude},${mapPickerCoordinates.longitude}`
 		: getValidatedMapLink() || "https://www.google.com/maps";
-}
-
-function scheduleNearbyPlacesSearch() {
-	window.clearTimeout(mapPlacesSearchTimer);
-	mapPlacesSearchTimer = window.setTimeout(loadNearbyPlaces, 500);
-}
-
-function isNearbyBusiness(feature) {
-	const { osm_key: key, osm_value: value, name } = feature.properties;
-	if (!name || ["highway", "building", "place", "boundary", "natural", "landuse"].includes(key)) {
-		return false;
-	}
-	if (["shop", "office", "craft", "tourism", "leisure", "healthcare", "emergency"].includes(key)) {
-		return true;
-	}
-	return key === "amenity" && !["bench", "waste_basket", "waste_disposal", "bicycle_parking", "parking_space"].includes(value);
-}
-
-function createBusinessPopup(feature) {
-	const content = document.createElement("div");
-	const name = document.createElement("strong");
-	name.textContent = feature.properties.name;
-	content.append(name);
-	const category = [feature.properties.osm_key, feature.properties.osm_value]
-		.filter(Boolean)
-		.join(" · ");
-	if (category) {
-		const detail = document.createElement("div");
-		detail.textContent = category;
-		content.append(detail);
-	}
-	return content;
-}
-
-async function loadNearbyPlaces() {
-	if (!mapPickerMap) {
-		return;
-	}
-	if (mapPickerProvider === "google") {
-		mapBusinessFeedback.textContent = "Google Maps muestra los comercios y lugares registrados en esta zona.";
-		return;
-	}
-	if (!mapPlacesLayer || mapPickerMap.getZoom() < 12) {
-		mapBusinessFeedback.textContent = "Acércate al mapa para ver comercios y servicios cercanos.";
-		return;
-	}
-	const requestId = ++mapPlacesRequestId;
-	const center = mapPickerMap.getCenter();
-	const bounds = mapPickerMap.getBounds();
-	const centerLabel = `${center.lat.toFixed(3)}, ${center.lng.toFixed(3)}`;
-	mapBusinessFeedback.textContent = "Buscando comercios y servicios cercanos...";
-	try {
-		const placesUrl = new URL("https://photon.komoot.io/reverse");
-		placesUrl.searchParams.set("lat", String(center.lat));
-		placesUrl.searchParams.set("lon", String(center.lng));
-		placesUrl.searchParams.set("limit", "50");
-		const response = await fetch(placesUrl, { headers: { Accept: "application/json" } });
-		if (!response.ok) {
-			throw new Error("No se pudieron cargar los comercios cercanos.");
-		}
-		const data = await response.json();
-		if (requestId !== mapPlacesRequestId || centerLabel !== `${mapPickerMap.getCenter().lat.toFixed(3)}, ${mapPickerMap.getCenter().lng.toFixed(3)}`) {
-			return;
-		}
-		if (!Array.isArray(data.features)) {
-			throw new Error("La respuesta de comercios no es válida.");
-		}
-		const businesses = data.features.filter((feature) => {
-			const [longitude, latitude] = feature.geometry.coordinates;
-			return isNearbyBusiness(feature) && bounds.contains([latitude, longitude]);
-		});
-		mapPlacesLayer.clearLayers();
-		for (const feature of businesses) {
-			const [longitude, latitude] = feature.geometry.coordinates;
-			const popup = createBusinessPopup(feature);
-			L.circleMarker([latitude, longitude], {
-				radius: 7,
-				color: "#ffffff",
-				weight: 2,
-				fillColor: "#e67d5e",
-				fillOpacity: 1
-			})
-				.bindPopup(popup)
-				.addTo(mapPlacesLayer)
-				.on("click", () => setMapPickerSelection({ lat: latitude, lng: longitude }));
-		}
-		mapBusinessFeedback.textContent = businesses.length
-			? `${businesses.length} comercios y servicios cercanos en esta zona. Toca un marcador para elegirlo.`
-			: "No hay comercios registrados en los datos abiertos de esta zona.";
-	} catch {
-		if (requestId === mapPlacesRequestId) {
-			mapBusinessFeedback.textContent = "No se pudieron cargar los comercios. Puedes seguir marcando el punto en el mapa.";
-		}
-	}
 }
 
 function hideMapSuggestions() {
@@ -1909,7 +2664,7 @@ function formatMapSuggestion(properties) {
 
 async function searchMapLocation() {
 	if (!mapPickerMap) {
-		mapPickerFeedback.textContent = "El mapa todavía no está listo. Cierra y vuelve a abrir el selector cuando tengas conexión.";
+		mapPickerFeedback.textContent = "El mapa aún no está listo. Comprueba tu conexión e intenta de nuevo.";
 		return;
 	}
 	const query = mapPickerInput.value.trim();
@@ -1943,50 +2698,41 @@ async function searchMapLocation() {
 				label: prediction.text.toString(),
 				googlePlace: true
 			}));
-			if (mapSuggestionItems.length === 0) {
-				hideMapSuggestions();
-				mapPickerFeedback.textContent = "Google Maps no encontró ese lugar. Prueba otra búsqueda o marca el punto.";
+		} else {
+			const searchUrl = new URL("https://photon.komoot.io/api/");
+			searchUrl.searchParams.set("q", query);
+			searchUrl.searchParams.set("limit", "5");
+			const mapCenter = getMapPickerCenter();
+			searchUrl.searchParams.set("lat", String(mapCenter.latitude));
+			searchUrl.searchParams.set("lon", String(mapCenter.longitude));
+			const response = await fetch(searchUrl, { cache: "no-store" });
+			if (!response.ok) {
+				throw new Error("No se pudo consultar el servicio de búsqueda.");
+			}
+			const data = await response.json();
+			if (requestId !== mapSuggestionRequestId || query !== mapPickerInput.value.trim()) {
 				return;
 			}
-			renderMapSuggestions();
-			mapPickerFeedback.textContent = "Elige un lugar de Google Maps para colocar el pin.";
-			return;
-		}
-		const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`, {
-			headers: { Accept: "application/json" }
-		});
-		if (!response.ok) {
-			throw new Error("Búsqueda no disponible");
-		}
-		const data = await response.json();
-		if (requestId !== mapSuggestionRequestId || query !== mapPickerInput.value.trim()) {
-			return;
-		}
-		if (!Array.isArray(data.features)) {
-			throw new Error("La respuesta de búsqueda no es válida.");
-		}
-		mapSuggestionItems = data.features
-			.map((feature) => ({
+			mapSuggestionItems = (data.features || []).map((feature) => ({
 				label: formatMapSuggestion(feature.properties),
-				latitude: Number(feature.geometry.coordinates[1]),
-				longitude: Number(feature.geometry.coordinates[0])
-			}))
-			.filter((place) => place.label && Number.isFinite(place.latitude) && Number.isFinite(place.longitude));
+				latitude: feature.geometry.coordinates[1],
+				longitude: feature.geometry.coordinates[0],
+				googlePlace: false
+			})).filter((place) => place.label && hasValidCoordinates(place));
+		}
 		if (mapSuggestionItems.length === 0) {
 			hideMapSuggestions();
-			mapPickerFeedback.textContent = "No encontramos ese lugar. Prueba otra dirección o toca el mapa.";
+			mapPickerFeedback.textContent = "No encontramos lugares con ese nombre. Intenta con otra referencia o toca el mapa.";
 			return;
 		}
 		renderMapSuggestions();
-		mapPickerFeedback.textContent = "Elige una dirección de la lista para colocar el pin.";
+		mapPickerFeedback.textContent = "Elige una sugerencia para ubicar el mapa.";
 	} catch (error) {
 		if (requestId !== mapSuggestionRequestId) {
 			return;
 		}
 		hideMapSuggestions();
-		mapPickerFeedback.textContent = error instanceof TypeError
-			? "No se pudieron cargar sugerencias. Revisa la conexión o marca el punto directamente en el mapa."
-			: `No se pudo buscar la dirección: ${error.message}`;
+		mapPickerFeedback.textContent = `No se pudo buscar: ${getBackendError(error)}`;
 	}
 }
 
@@ -2024,7 +2770,7 @@ async function selectGooglePlace(placeId) {
 			lng: place.location.lng()
 		}, false, place.formattedAddress || place.displayName);
 	} catch (error) {
-		mapPickerFeedback.textContent = `No se pudo abrir ese lugar de Google Maps: ${error.message}`;
+		mapPickerFeedback.textContent = `No se pudo abrir ese lugar de Google Maps: ${getBackendError(error)}`;
 	}
 }
 
@@ -2050,32 +2796,42 @@ async function selectMapSuggestion(index) {
 					lng: googlePlace.location.lng()
 				}, false, googlePlace.formattedAddress || googlePlace.displayName);
 			} catch (error) {
-				mapPickerFeedback.textContent = `No se pudo cargar el lugar: ${error.message}`;
+				mapPickerFeedback.textContent = `No se pudo cargar el lugar: ${getBackendError(error)}`;
 			}
 		}
 		return;
 	}
-	void setMapPickerSelection({ lat: place.latitude, lng: place.longitude });
-	mapPickerInput.value = place.label;
-	mapPickerFeedback.textContent = "Lugar encontrado. Ajusta el pin si hace falta y confirma la ubicación.";
-	void updateMapPicker();
+	void setMapPickerSelection({ lat: place.latitude, lng: place.longitude }, false, place.label);
 }
 
 async function setMapPickerSelection(point, reverseGeocode = false, displayName = "") {
+	const reverseRequestId = ++mapReverseGeocodeRequestId;
+	if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng) ||
+		point.lat < -90 || point.lat > 90 || point.lng < -180 || point.lng > 180) {
+		mapPickerFeedback.textContent = "No se pudo usar ese punto. Selecciona una ubicación válida en el mapa.";
+		return;
+	}
 	mapPickerCoordinates = { latitude: point.lat, longitude: point.lng };
-	if (mapPickerProvider === "google") {
+	if (mapPickerProvider === "google" && mapPickerMap) {
 		const position = { lat: point.lat, lng: point.lng };
 		mapPickerMap.setCenter(position);
 		mapPickerMap.setZoom(Math.max(mapPickerMap.getZoom(), 15));
 		mapPickerMarker.setPosition(position);
 		mapPickerMarker.setMap(mapPickerMap);
-	} else {
+	} else if (mapPickerProvider === "mapbox" && mapPickerMap) {
+		const position = [point.lng, point.lat];
+		mapPickerMap.flyTo({ center: position, zoom: Math.max(mapPickerMap.getZoom(), 15) });
+		mapPickerMarker.setLngLat(position).addTo(mapPickerMap);
+	} else if (mapPickerProvider === "leaflet" && mapPickerMap) {
 		mapPickerMap.setView([point.lat, point.lng], Math.max(mapPickerMap.getZoom(), 15));
 		if (mapPickerMarker) {
 			mapPickerMarker.setLatLng([point.lat, point.lng]);
 		} else {
-			mapPickerMarker = L.marker([point.lat, point.lng], { draggable: true }).addTo(mapPickerMap);
-			mapPickerMarker.on("dragend", () => setMapPickerSelection(mapPickerMarker.getLatLng(), true));
+			mapPickerMarker = window.L.marker([point.lat, point.lng], { draggable: true }).addTo(mapPickerMap);
+			mapPickerMarker.on("dragend", () => {
+				const pos = mapPickerMarker.getLatLng();
+				void setMapPickerSelection({ lat: pos.lat, lng: pos.lng }, true);
+			});
 		}
 	}
 	mapPickerInput.value = displayName || `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
@@ -2085,21 +2841,47 @@ async function setMapPickerSelection(point, reverseGeocode = false, displayName 
 		return;
 	}
 	try {
-		const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${point.lat}&lon=${point.lng}`);
+		const reverseUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+		reverseUrl.searchParams.set("format", "jsonv2");
+		reverseUrl.searchParams.set("lat", String(point.lat));
+		reverseUrl.searchParams.set("lon", String(point.lng));
+		const controller = new AbortController();
+		const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+		let response;
+		try {
+			response = await fetch(reverseUrl, { signal: controller.signal });
+		} finally {
+			window.clearTimeout(timeoutId);
+		}
 		if (!response.ok) {
-			return;
+			throw new Error("No se pudo consultar la dirección.");
 		}
 		const result = await response.json();
-		if (result.display_name) {
+		if (reverseRequestId === mapReverseGeocodeRequestId && result.display_name) {
 			mapPickerInput.value = result.display_name;
 			mapPickerFeedback.textContent = "Dirección encontrada. Confirma para agregarla al pedido.";
 			void updateMapPicker();
 		}
 	} catch {
-		mapPickerFeedback.textContent = "Punto marcado. Se guardarán las coordenadas seleccionadas.";
+		if (reverseRequestId === mapReverseGeocodeRequestId) {
+			mapPickerFeedback.textContent = "Punto marcado. No pudimos obtener la dirección; se guardarán las coordenadas seleccionadas.";
+		}
 	}
 }
 
+function getMapPickerCenter() {
+	if (!mapPickerMap) {
+		return DELIVERY_ORIGIN;
+	}
+	const center = mapPickerMap.getCenter();
+	if (mapPickerProvider === "google") {
+		return { latitude: center.lat(), longitude: center.lng() };
+	}
+	if (mapPickerProvider === "mapbox") {
+		return { latitude: center.lat, longitude: center.lng };
+	}
+	return { latitude: center.lat, longitude: center.lng };
+}
 function selectMapPickerLocation() {
 	if (!mapPickerCoordinates) {
 		mapPickerFeedback.textContent = "Toca el mapa o busca un lugar para marcar el punto.";
@@ -2125,14 +2907,34 @@ function useLocationInPicker() {
 	}
 	mapPickerCurrentLocationButton.disabled = true;
 	mapPickerFeedback.textContent = "Buscando ubicación...";
-	navigator.geolocation.getCurrentPosition((position) => {
-		setMapPickerSelection({ lat: position.coords.latitude, lng: position.coords.longitude }, true);
-		mapPickerFeedback.textContent = "Ubicación actual lista. Confirma para agregarla al pedido.";
+	navigator.geolocation.getCurrentPosition(async (position) => {
+		await setMapPickerSelection({ lat: position.coords.latitude, lng: position.coords.longitude });
+		const accuracy = Math.round(position.coords.accuracy);
+		mapPickerFeedback.textContent = `Ubicación actual lista (precisión aproximada: ±${accuracy} m). Revisa el pin y confirma.`;
 		mapPickerCurrentLocationButton.disabled = false;
-	}, () => {
-		mapPickerFeedback.textContent = "No se pudo obtener la ubicación. Revisa los permisos del navegador.";
+	}, (error) => {
+		mapPickerFeedback.textContent = getGeolocationErrorMessage(error);
 		mapPickerCurrentLocationButton.disabled = false;
 	}, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function getGeolocationErrorMessage(error) {
+	if (!navigator.geolocation) {
+		return "Este navegador no permite obtener la ubicación actual.";
+	}
+	if (!window.isSecureContext) {
+		return "El GPS requiere una conexión segura. Abre la tienda con Live Server o desde su sitio HTTPS.";
+	}
+	if (error?.code === 1) {
+		return "No se autorizó el GPS. Permite el acceso a la ubicación en tu navegador e inténtalo de nuevo.";
+	}
+	if (error?.code === 2) {
+		return "El dispositivo no pudo determinar la ubicación. Comprueba que el GPS esté activo.";
+	}
+	if (error?.code === 3) {
+		return "La búsqueda de ubicación tardó demasiado. Inténtalo otra vez o marca el punto en el mapa.";
+	}
+	return "No se pudo obtener la ubicación. Revisa los permisos del navegador e inténtalo de nuevo.";
 }
 
 function showPaymentDetails(paymentMethod) {
@@ -2272,14 +3074,14 @@ function useCurrentLocation() {
 		deliveryAddress.value = `Ubicación GPS (${deliveryCoordinates.latitude.toFixed(6)}, ${deliveryCoordinates.longitude.toFixed(6)})`;
 		deliveryToggle.checked = true;
 		deliveryFields.hidden = false;
-		mapFeedback.textContent = "Ubicación actual señalada en el mapa.";
+		mapFeedback.textContent = `Ubicación GPS seleccionada (precisión aproximada: ±${Math.round(position.coords.accuracy)} m).`;
 		deliveryFeedback.textContent = "";
 		deliveryMapLink.value = `https://www.google.com/maps/search/?api=1&query=${deliveryCoordinates.latitude},${deliveryCoordinates.longitude}`;
 		updateDeliveryEstimate();
 		updateDeliveryMap();
 		useCurrentLocationButton.disabled = false;
-	}, () => {
-		mapFeedback.textContent = "No se pudo obtener la ubicación. Revisa los permisos del navegador.";
+	}, (error) => {
+		mapFeedback.textContent = getGeolocationErrorMessage(error);
 		useCurrentLocationButton.disabled = false;
 	}, { enableHighAccuracy: true, timeout: 10000 });
 }
@@ -2353,6 +3155,8 @@ async function completePurchase(paymentMethod) {
 productForm.addEventListener("submit", async (event) => {
 	event.preventDefault();
 	const name = productNameInput.value.trim();
+	const brand = productBrandInput.value.trim();
+	const imageUrl = getSafeProductImageUrl(productImageUrlInput.value);
 	const price = Number(productPriceInput.value);
 	const stockAmount = Number(productStockInput.value);
 	const saleMode = productSaleModeInput.value;
@@ -2360,6 +3164,10 @@ productForm.addEventListener("submit", async (event) => {
 	const invalidWeightPrecision = saleMode === "weight" &&
 		Math.abs(stockAmount * GRAMS_PER_KILOGRAM - stock) > 1e-6;
 
+	if (productImageUrlInput.value.trim() && !imageUrl) {
+		showFeedback("La foto debe tener un enlace HTTPS válido.", true);
+		return;
+	}
 	if (!name || !Number.isFinite(price) || price <= 0 || !Number.isFinite(stockAmount) ||
 		stockAmount < 0 || (saleMode === "unit" && !Number.isInteger(stockAmount)) ||
 		invalidWeightPrecision || (stockAmount > 0 && stock === 0)) {
@@ -2382,6 +3190,8 @@ productForm.addEventListener("submit", async (event) => {
 	if (editedProduct) {
 		const saleModeChanged = editedProduct.saleMode !== saleMode;
 		editedProduct.name = name;
+		editedProduct.brand = brand;
+		editedProduct.imageUrl = imageUrl;
 		editedProduct.price = price;
 		editedProduct.category = productCategoryInput.value;
 		editedProduct.saleMode = saleMode;
@@ -2395,6 +3205,8 @@ productForm.addEventListener("submit", async (event) => {
 		products.push({
 			id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
 			name,
+			brand,
+			imageUrl,
 			price,
 			category: productCategoryInput.value,
 			saleMode,
@@ -2417,6 +3229,7 @@ productForm.addEventListener("submit", async (event) => {
 	}
 	lastSuggestedProductCategory = null;
 	productForm.reset();
+	updateProductImagePreview();
 	productCategoryHint.textContent = "";
 	configureProductFormMode();
 	editingProductId = null;
@@ -2444,7 +3257,36 @@ productForm.addEventListener("submit", async (event) => {
 
 document.querySelector("#cancel-edit-button").addEventListener("click", cancelProductEdit);
 paymentSettingsForm.addEventListener("submit", savePaymentSettings);
+searchProductImageButton.addEventListener("click", () => {
+	const productName = productNameInput.value.trim();
+	if (!productName) {
+		showFeedback("Escribe primero el nombre del producto para buscar una imagen.", true);
+		productNameInput.focus();
+		return;
+	}
+	const query = [productBrandInput.value.trim(), productName, "producto empaque"]
+		.filter(Boolean)
+		.join(" ");
+	const searchUrl = new URL("https://www.google.com/search");
+	searchUrl.searchParams.set("tbm", "isch");
+	searchUrl.searchParams.set("q", query);
+	window.open(searchUrl.href, "_blank", "noopener,noreferrer");
+});
+productImageUrlInput.addEventListener("input", updateProductImagePreview);
+productBrandInput.addEventListener("input", updateProductImageAlt);
+catalogRetryButton.addEventListener("click", async () => {
+	catalogRetryButton.disabled = true;
+	catalogRetryButton.textContent = "Reintentando…";
+	catalogLoadError = false;
+	try {
+		await refreshStoreData();
+	} finally {
+		catalogRetryButton.disabled = false;
+		catalogRetryButton.textContent = "Intentar de nuevo";
+	}
+});
 productNameInput.addEventListener("input", updateProductCategorySuggestion);
+productNameInput.addEventListener("input", updateProductImageAlt);
 productCategoryInput.addEventListener("change", () => {
 	const nextMode = ["Carnes", "Charcutería"].includes(productCategoryInput.value) ? "weight" : "unit";
 	if (!isSuggestingProductCategory) {
@@ -2470,11 +3312,34 @@ productSaleModeInput.addEventListener("change", () => {
 	}
 	configureProductFormMode();
 });
-searchInput.addEventListener("input", renderProducts);
-inventorySearchInput.addEventListener("input", renderAdminProducts);
+searchInput.addEventListener("input", debounce(renderProducts, 120));
+catalogSort.addEventListener("change", renderProducts);
+availabilityFilter.addEventListener("click", () => {
+	showAvailableOnly = !showAvailableOnly;
+	availabilityFilter.setAttribute("aria-pressed", String(showAvailableOnly));
+	availabilityFilter.classList.toggle("active", showAvailableOnly);
+	renderProducts();
+});
+clearCatalogFiltersButton.addEventListener("click", () => {
+	searchInput.value = "";
+	catalogSort.value = "recommended";
+	showAvailableOnly = false;
+	availabilityFilter.setAttribute("aria-pressed", "false");
+	availabilityFilter.classList.remove("active");
+	activeCategory = "Todos";
+	document.querySelectorAll(".category-filter").forEach((filterButton) => {
+		const isActive = filterButton.dataset.category === "Todos";
+		filterButton.classList.toggle("active", isActive);
+		filterButton.setAttribute("aria-pressed", String(isActive));
+	});
+	renderProducts();
+	searchInput.focus();
+});
+document.querySelector("#mobile-checkout-button").addEventListener("click", openCheckout);
+inventorySearchInput.addEventListener("input", debounce(renderAdminProducts, 120));
 stockFilter.addEventListener("change", renderAdminProducts);
-document.querySelector("#category-filters").addEventListener("click", (event) => {
-	const button = event.target.closest("[data-category]");
+categoryFilters.addEventListener("click", (event) => {
+	const button = event.target.closest("button[data-category]");
 	if (!button) {
 		return;
 	}
@@ -2515,7 +3380,7 @@ purchaseReviewDialog.addEventListener("close", () => {
 	activeReviewOrderId = null;
 });
 salesStatusFilter.addEventListener("change", renderSales);
-salesSearchInput.addEventListener("input", renderSales);
+salesSearchInput.addEventListener("input", debounce(renderSales, 120));
 salesOrdersList.addEventListener("click", (event) => {
 	const button = event.target.closest("[data-order-action]");
 	if (!button) {
@@ -2671,6 +3536,7 @@ useCurrentLocationButton.addEventListener("click", useCurrentLocation);
 openMapPickerButton.addEventListener("click", openMapPicker);
 mapPickerInput.addEventListener("input", () => {
 	mapSuggestionRequestId++;
+	mapReverseGeocodeRequestId++;
 	mapPickerCoordinates = null;
 	hideMapSuggestions();
 	mapPickerFeedback.textContent = mapPickerInput.value.trim().length >= 3
@@ -2692,6 +3558,26 @@ mapPickerInput.addEventListener("input", () => {
 	}
 });
 document.querySelector("#search-map-location").addEventListener("click", searchMapLocation);
+retryMapLoadButton.addEventListener("click", async () => {
+	retryMapLoadButton.disabled = true;
+	mapPickerMapStatusMessage.textContent = "Cargando el mapa…";
+	try {
+		await updateMapPicker();
+	} finally {
+		retryMapLoadButton.disabled = false;
+	}
+});
+mapPickerDialog.addEventListener("close", () => {
+	mapSuggestionRequestId++;
+	mapReverseGeocodeRequestId++;
+	nearbyPlacesRequestId++;
+	window.clearTimeout(mapPickerSearchTimer);
+	window.clearTimeout(nearbyPlacesSearchTimer);
+	hideMapSuggestions();
+});
+refreshNearbyPlacesButton.addEventListener("click", () => {
+	void loadNearbyPlaces(true);
+});
 mapPickerInput.addEventListener("keydown", (event) => {
 	if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 		if (mapSuggestionItems.length === 0) {
@@ -2775,6 +3661,9 @@ accountForm.addEventListener("submit", async (event) => {
 	}
 });
 signOutButton.addEventListener("click", async () => {
+	if (!supabaseClient) {
+		return;
+	}
 	try {
 		const { error } = await supabaseClient.auth.signOut();
 		if (error) {
@@ -2839,6 +3728,9 @@ document.querySelector("#sales-date").textContent = new Intl.DateTimeFormat("es"
 	month: "long",
 	year: "numeric"
 }).format(new Date()).toLocaleUpperCase("es");
+document.querySelectorAll("[data-icon]").forEach((element) => {
+	element.append(createInterfaceIcon(element.dataset.icon));
+});
 configureProductFormMode();
 window.setInterval(() => {
 	if (document.visibilityState === "visible") {
@@ -2855,5 +3747,6 @@ renderCart();
 renderSales();
 renderShoppingReviewSummary();
 updatePaymentMethodAvailability();
+renderExchangeRate();
 loadDailyRate();
 initializeBackend();
